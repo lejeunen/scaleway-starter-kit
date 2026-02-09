@@ -17,6 +17,7 @@ crash.log
 
 # Ignore all .terraform files in the current directory
 .terraform/
+.terraform.lock.hcl
 
 # Ignore backup files created by Terraform
 *.backup
