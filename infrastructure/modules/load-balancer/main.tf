@@ -4,14 +4,13 @@ resource "scaleway_lb_ip" "this" {
 
 resource "scaleway_lb" "this" {
   name  = var.lb_name
-  ip_id = scaleway_lb_ip.this.id
+  ip_ids = [scaleway_lb_ip.this.id]
   zone  = var.zone
   type  = var.lb_type
   tags  = var.tags
 
   private_network {
     private_network_id = var.private_network_id
-    dhcp_config        = true
   }
 }
 
