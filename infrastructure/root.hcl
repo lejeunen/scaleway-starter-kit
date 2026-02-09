@@ -5,7 +5,7 @@ remote_state {
     bucket     = "scaleway-starter-kit"
     key        = "${path_relative_to_include()}/terraform.tfstate"
     region     = "fr-par"
-    encrypt    = true
+    encrypt    = false
     access_key = get_env("SCW_ACCESS_KEY")
     secret_key = get_env("SCW_SECRET_KEY")
 
