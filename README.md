@@ -158,6 +158,37 @@ kubectl get nodes
    terragrunt run --all apply
    ```
 
+## Validation & Security Scanning
+
+A validation script checks formatting, configuration, dependencies, linting, and security:
+
+```bash
+source .env
+./scripts/validate.sh
+```
+
+The script runs the following checks:
+
+| Check | Tool | Description |
+|-------|------|-------------|
+| HCL format | `terragrunt hcl fmt` | Ensures consistent formatting |
+| Terraform validation | `terragrunt validate` | Validates resource configurations |
+| Dependency graph | `terragrunt dag graph` | Detects circular dependencies |
+| Linting | `tflint` | Catches common Terraform mistakes |
+| Security scan | `trivy` | Flags security misconfigurations (HIGH/CRITICAL) |
+
+Optional tools (`tflint`, `trivy`) are skipped if not installed:
+
+```bash
+brew install tflint trivy
+```
+
+To validate a different environment:
+
+```bash
+./scripts/validate.sh infrastructure/staging
+```
+
 ## Tear Down
 
 ```bash
