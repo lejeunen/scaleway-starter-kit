@@ -1,0 +1,46 @@
+# Ignore env file
+.env
+
+# Ignore the .terragrunt-cache directory
+.terragrunt-cache/
+
+# Ignore Terraform state files
+*.tfstate
+*.tfstate.*
+
+# Ignore backup files created by the editor
+*~
+*.bak
+
+# Ignore crash log files
+crash.log
+
+# Ignore all .terraform files in the current directory
+.terraform/
+
+# Ignore backup files created by Terraform
+*.backup
+
+# Ignore log files
+*.log
+
+# Ignore temporary files
+*.tmp
+temp
+
+# Ignore files created by IDEs or editors
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore lsp plugin
+/lsp/
+
+# Claude
+**/.claude/**
