@@ -58,21 +58,3 @@ variable "pool_autoscaling" {
   type        = bool
   default     = true
 }
-
-variable "auto_upgrade_enabled" {
-  description = "Enable automatic Kubernetes version upgrades"
-  type        = bool
-  default     = true
-}
-
-variable "auto_upgrade_day" {
-  description = "Day for the maintenance window"
-  type        = string
-  default     = "sunday"
-}
-
-variable "auto_upgrade_hour" {
-  description = "Start hour for maintenance window (UTC)"
-  type        = number
-  default     = 3
-}

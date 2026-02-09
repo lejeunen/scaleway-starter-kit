@@ -8,12 +8,6 @@ resource "scaleway_k8s_cluster" "this" {
 
   delete_additional_resources = true
 
-  auto_upgrade {
-    enable                        = var.auto_upgrade_enabled
-    maintenance_window_start_hour = var.auto_upgrade_hour
-    maintenance_window_day        = var.auto_upgrade_day
-  }
-
   autoscaler_config {
     disable_scale_down           = false
     scale_down_delay_after_add   = "5m"
