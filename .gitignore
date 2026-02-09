@@ -1,5 +1,6 @@
-# Ignore env file
+# Ignore env file and kubeconfig (contain credentials)
 .env
+**/.kubeconfig
 
 # Ignore the .terragrunt-cache directory
 .terragrunt-cache/
