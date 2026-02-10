@@ -30,6 +30,9 @@ locals {
   db_backup_frequency = 24
   db_backup_retention = 7
 
+  # Secret Manager
+  secret_name = "dev-db-password"
+
   # Load Balancer
   lb_name = "dev-lb"
   lb_type = "LB-S"
