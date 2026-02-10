@@ -133,7 +133,19 @@ Then load it:
 source .env
 ```
 
-### 3. Deploy the infrastructure
+### 3. (Optional) Custom domain with HTTPS
+
+If you want HTTPS with a custom domain, register it in the [Scaleway Domains](https://console.scaleway.com/domains/) console and set `domain_name` in `infrastructure/dev/env.hcl`:
+
+```hcl
+domain_name = "yourdomain.eu"
+```
+
+The load balancer will automatically create a DNS A record, obtain a Let's Encrypt certificate, and redirect HTTP to HTTPS. If you skip this step, the load balancer works on plain HTTP.
+
+> **Note:** On the first apply, the certificate creation may fail if DNS hasn't propagated yet. Simply re-run `terragrunt apply` in the load-balancer directory after a minute.
+
+### 4. Deploy the infrastructure
 
 ```bash
 cd infrastructure/dev
@@ -142,7 +154,7 @@ terragrunt run --all apply
 
 Terragrunt will deploy in order: VPC → Kapsule + Database (parallel) → Load Balancer. Secret Manager and Container Registry are independent and deploy in parallel with the rest.
 
-### 4. Generate the kubeconfig
+### 5. Generate the kubeconfig
 
 After the Kapsule cluster is deployed:
 
@@ -159,7 +171,7 @@ source .env
 kubectl get nodes
 ```
 
-### 5. Deploy the application
+### 6. Deploy the application
 
 The starter kit includes Kubernetes manifests for **Sovereign Cloud Wisdom**, a demo application that serves curated wisdom about European digital sovereignty. The app source code lives in a separate repository.
 
@@ -185,7 +197,7 @@ The script will:
 The script prints the node IPs at the end. Update `infrastructure/dev/load-balancer/terragrunt.hcl`:
 
 ```hcl
-backend_server_ips = ["10.x.x.x", "10.x.x.x"]
+backend_server_ips = ["172.16.x.x", "172.16.x.x"]
 ```
 
 Then apply:
