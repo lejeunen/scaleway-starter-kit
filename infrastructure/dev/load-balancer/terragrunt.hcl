@@ -41,5 +41,7 @@ inputs = {
   zone               = local.env.locals.zone
   private_network_id = dependency.vpc.outputs.private_network_id
   tags               = local.env.locals.tags
+  backend_port       = 30080
+  health_check_uri   = "/health"
   backend_server_ips = []
 }

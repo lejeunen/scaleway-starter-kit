@@ -30,6 +30,9 @@ locals {
   db_backup_frequency = 24
   db_backup_retention = 7
 
+  # Container Registry
+  registry_name = "dev-sovereign-wisdom"
+
   # Secret Manager
   secret_name = "dev-db-password"
 

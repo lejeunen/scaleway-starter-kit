@@ -22,7 +22,7 @@ resource "scaleway_lb_backend" "this" {
   server_ips       = var.backend_server_ips
 
   health_check_http {
-    uri = "/"
+    uri = var.health_check_uri
   }
 
   health_check_max_retries = 3

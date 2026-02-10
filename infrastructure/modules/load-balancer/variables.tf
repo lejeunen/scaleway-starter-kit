@@ -32,9 +32,15 @@ variable "frontend_port" {
 }
 
 variable "backend_port" {
-  description = "Port to forward traffic to on backend servers"
+  description = "Port to forward traffic to on backend servers."
   type        = number
   default     = 80
+}
+
+variable "health_check_uri" {
+  description = "URI for HTTP health checks on backend servers."
+  type        = string
+  default     = "/"
 }
 
 variable "backend_server_ips" {
