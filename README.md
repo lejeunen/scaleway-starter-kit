@@ -265,7 +265,7 @@ To validate a different environment:
 
 ## Compliance & Sovereignty
 
-This project is designed with European data sovereignty in mind. All resources are deployed exclusively in France (`fr-par`), using Scaleway — a French cloud provider not subject to the US CLOUD Act.
+This project is designed with European data sovereignty in mind. All resources are deployed exclusively in France (`fr-par`), using Scaleway — a French cloud provider not subject to US extraterritorial surveillance laws (CLOUD Act, FISA Section 702).
 
 For details on how this project addresses GDPR, SecNumCloud, NIS2, and DORA requirements, see:
 - [COMPLIANCE.md](COMPLIANCE.md) (English)

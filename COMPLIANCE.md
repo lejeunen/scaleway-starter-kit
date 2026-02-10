@@ -5,7 +5,7 @@ This project is designed to meet European data sovereignty and regulatory requir
 ## Table of Contents
 
 - [Legal Framework](#legal-framework)
-  - [The US CLOUD Act Problem](#the-us-cloud-act-problem)
+  - [US Extraterritorial Surveillance](#us-extraterritorial-surveillance)
   - [European Digital Sovereignty](#european-digital-sovereignty)
   - [SecNumCloud](#secnumcloud)
   - [GDPR / RGPD](#gdpr--rgpd)
@@ -24,15 +24,21 @@ This project is designed to meet European data sovereignty and regulatory requir
 
 ## Legal Framework
 
-### The US CLOUD Act Problem
+### US Extraterritorial Surveillance
 
-The US Clarifying Lawful Overseas Use of Data (CLOUD) Act of 2018 grants US law enforcement the authority to compel US-headquartered companies to disclose data stored on their servers — **regardless of where that data is physically located**. This means data hosted on AWS, Azure, or GCP in a European datacenter can still be subject to US jurisdiction.
+Several US laws grant authorities access to data held by US companies, regardless of where that data is physically stored:
 
-This directly conflicts with:
+- **CLOUD Act** (2018) — Grants US law enforcement the authority to compel US-headquartered companies to disclose data stored on their servers, **regardless of where that data is physically located**. Data hosted on AWS, Azure, or GCP in a European datacenter can still be subject to US jurisdiction.
+
+- **FISA Section 702** — Allows the NSA to compel US companies to provide data on non-US persons without individual warrants. This applies to any company subject to US jurisdiction and was the core issue behind the Schrems II ruling. Unlike the CLOUD Act (which targets specific legal proceedings), FISA 702 enables **bulk surveillance**.
+
+- **Executive Order 12333** — Authorizes intelligence collection of data in transit (e.g., tapping undersea cables and internet backbone infrastructure) without judicial oversight. This means data doesn't need to be at rest on US servers to be intercepted.
+
+These laws directly conflict with:
 - **GDPR Article 48**, which restricts data transfers to third-country authorities without an international agreement
-- The **Schrems II ruling** (CJEU, July 2020), which invalidated the EU-US Privacy Shield and raised concerns about Standard Contractual Clauses when data processors are subject to US surveillance laws
+- The **Schrems II ruling** (CJEU, July 2020), which invalidated the EU-US Privacy Shield over concerns about US surveillance of EU citizens' data
 
-By using a **European cloud provider** not subject to US jurisdiction, this project eliminates the structural legal conflict between the CLOUD Act and GDPR.
+By using a **European cloud provider** not subject to US jurisdiction, this project eliminates the structural legal conflict between US surveillance laws and GDPR.
 
 ### European Digital Sovereignty
 

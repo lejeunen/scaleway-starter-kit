@@ -5,7 +5,7 @@ Ce projet est conçu pour répondre aux exigences européennes en matière de so
 ## Table des matières
 
 - [Cadre juridique](#cadre-juridique)
-  - [Le problème du CLOUD Act américain](#le-problème-du-cloud-act-américain)
+  - [Surveillance extraterritoriale américaine](#surveillance-extraterritoriale-américaine)
   - [Souveraineté numérique européenne](#souveraineté-numérique-européenne)
   - [SecNumCloud](#secnumcloud)
   - [RGPD](#rgpd)
@@ -24,15 +24,21 @@ Ce projet est conçu pour répondre aux exigences européennes en matière de so
 
 ## Cadre juridique
 
-### Le problème du CLOUD Act américain
+### Surveillance extraterritoriale américaine
 
-Le CLOUD Act américain (Clarifying Lawful Overseas Use of Data Act, 2018) autorise la justice américaine à contraindre les entreprises dont le siège est aux États-Unis à divulguer les données stockées sur leurs serveurs — **quel que soit le lieu physique de stockage de ces données**. Cela signifie que des données hébergées sur AWS, Azure ou GCP dans un datacenter européen peuvent être soumises à la juridiction américaine.
+Plusieurs lois américaines permettent aux autorités d'accéder aux données détenues par des entreprises américaines, quel que soit le lieu physique de stockage :
 
-Cela entre directement en conflit avec :
+- **CLOUD Act** (2018) — Autorise la justice américaine à contraindre les entreprises dont le siège est aux États-Unis à divulguer les données stockées sur leurs serveurs, **quel que soit le lieu physique de stockage de ces données**. Des données hébergées sur AWS, Azure ou GCP dans un datacenter européen peuvent être soumises à la juridiction américaine.
+
+- **FISA Section 702** — Permet à la NSA de contraindre les entreprises américaines à fournir les données de personnes non américaines, sans mandat individuel. Cette loi s'applique à toute entreprise soumise à la juridiction américaine et constitue le problème central de l'arrêt Schrems II. Contrairement au CLOUD Act (qui vise des procédures judiciaires spécifiques), FISA 702 permet une **surveillance de masse**.
+
+- **Executive Order 12333** — Autorise la collecte de renseignements sur les données en transit (écoute de câbles sous-marins et d'infrastructures réseau) sans contrôle judiciaire. Les données n'ont pas besoin d'être stockées sur des serveurs américains pour être interceptées.
+
+Ces lois entrent directement en conflit avec :
 - **L'article 48 du RGPD**, qui restreint les transferts de données personnelles vers des autorités de pays tiers en l'absence d'accord international
-- **L'arrêt Schrems II** (CJUE, juillet 2020), qui a invalidé le Privacy Shield UE-US et soulevé des inquiétudes quant aux clauses contractuelles types lorsque les sous-traitants sont soumis aux lois de surveillance américaines
+- **L'arrêt Schrems II** (CJUE, juillet 2020), qui a invalidé le Privacy Shield UE-US en raison des préoccupations liées à la surveillance américaine des données des citoyens européens
 
-En utilisant un **fournisseur cloud européen** non soumis à la juridiction américaine, ce projet élimine le conflit juridique structurel entre le CLOUD Act et le RGPD.
+En utilisant un **fournisseur cloud européen** non soumis à la juridiction américaine, ce projet élimine le conflit juridique structurel entre les lois de surveillance américaines et le RGPD.
 
 ### Souveraineté numérique européenne
 
