@@ -44,8 +44,14 @@ done
 
 info "Collecting infrastructure outputs..."
 
-DB_ENDPOINT_IP=$(cd "$INFRA_DEV_DIR/database" && terragrunt output -raw endpoint_ip 2>/dev/null)
-DB_ENDPOINT_PORT=$(cd "$INFRA_DEV_DIR/database" && terragrunt output -raw endpoint_port 2>/dev/null)
+DB_ENDPOINT_IP=$(cd "$INFRA_DEV_DIR/database" && terragrunt output -raw endpoint_ip) || {
+    err "Failed to get database endpoint IP. Is the database deployed?"
+    exit 1
+}
+DB_ENDPOINT_PORT=$(cd "$INFRA_DEV_DIR/database" && terragrunt output -raw endpoint_port) || {
+    err "Failed to get database endpoint port. Is the database deployed?"
+    exit 1
+}
 
 ok "Database endpoint: $DB_ENDPOINT_IP:$DB_ENDPOINT_PORT"
 

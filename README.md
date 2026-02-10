@@ -149,6 +149,7 @@ After the Kapsule cluster is deployed:
 ```bash
 cd infrastructure/dev/kapsule
 terragrunt output -json kubeconfig | jq -r '.[0].config_file' > ../.kubeconfig
+chmod 600 ../.kubeconfig
 ```
 
 Then reload your environment:
