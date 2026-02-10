@@ -18,6 +18,7 @@ spec:
       containers:
         - name: sovereign-wisdom
           image: rg.fr-par.scw.cloud/dev-sovereign-wisdom/sovereign-cloud-wisdom:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8000
           env:
