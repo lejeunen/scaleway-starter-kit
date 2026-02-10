@@ -96,6 +96,8 @@ All infrastructure resources in this project are deployed exclusively in **Franc
 | Kubernetes Cluster (Kapsule)  | `fr-par`        | `fr-par-1` |
 | PostgreSQL Database           | `fr-par`        | —          |
 | Load Balancer                 | —               | `fr-par-1` |
+| Secret Manager                | `fr-par`        | —          |
+| Container Registry            | `fr-par`        | —          |
 | Terraform State (S3)          | `fr-par`        | —          |
 
 No data leaves French territory. Scaleway's Paris datacenters (DC2-DC5) are located in the Île-de-France region.
@@ -131,11 +133,16 @@ Internet → Load Balancer (Public IP) → Private Network (172.16.0.0/22) → K
 
 ### Credentials Management
 
-- All credentials (API keys, database passwords) are sourced from environment variables — never hardcoded
+- **Scaleway Secret Manager:** Database credentials are stored in Scaleway's managed Secret Manager service, using envelope encryption (AES-256) via KMS
+  - *Code:* [`infrastructure/modules/secret-manager/main.tf`](infrastructure/modules/secret-manager/main.tf)
+- **External Secrets Operator:** Secrets are synced from Scaleway Secret Manager to Kubernetes secrets at runtime — credentials are never baked into manifests or container images
+  - *Code:* [`k8s/external-secrets/`](k8s/external-secrets/)
+- **No hardcoded credentials:** All credentials (API keys, database passwords) are sourced from environment variables or Secret Manager — never committed to code
   - *Code:* `.env.example` for credential template, `.gitignore` excludes `.env`
-- Sensitive Terraform outputs are marked `sensitive = true` to prevent accidental exposure in logs
+- **Sensitive outputs:** Terraform outputs containing secrets are marked `sensitive = true` to prevent accidental exposure in logs
   - *Code:* [`infrastructure/modules/kapsule/outputs.tf`](infrastructure/modules/kapsule/outputs.tf) — kubeconfig output
   - *Code:* [`infrastructure/modules/database/variables.tf`](infrastructure/modules/database/variables.tf) — password variable
+- **Strict validation:** Terragrunt fails fast if required secrets (e.g., `TF_VAR_db_password`) are not set — no fallback defaults
 
 ### Audit & Traceability
 

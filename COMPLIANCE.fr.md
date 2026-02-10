@@ -96,6 +96,8 @@ Toutes les ressources d'infrastructure de ce projet sont déployées exclusiveme
 | Cluster Kubernetes (Kapsule)  | `fr-par`         | `fr-par-1` |
 | Base de données PostgreSQL    | `fr-par`         | —          |
 | Load Balancer                 | —                | `fr-par-1` |
+| Secret Manager                | `fr-par`         | —          |
+| Container Registry            | `fr-par`         | —          |
 | État Terraform (S3)           | `fr-par`         | —          |
 
 Aucune donnée ne quitte le territoire français. Les datacenters parisiens de Scaleway (DC2-DC5) sont situés en Île-de-France.
@@ -131,11 +133,16 @@ Internet → Load Balancer (IP publique) → Réseau Privé (172.16.0.0/22) → 
 
 ### Gestion des secrets
 
-- Tous les identifiants (clés API, mots de passe base de données) sont issus de variables d'environnement — jamais codés en dur
+- **Scaleway Secret Manager :** les identifiants de base de données sont stockés dans le service Secret Manager managé de Scaleway, utilisant le chiffrement par enveloppe (AES-256) via KMS
+  - *Code :* [`infrastructure/modules/secret-manager/main.tf`](infrastructure/modules/secret-manager/main.tf)
+- **External Secrets Operator :** les secrets sont synchronisés depuis Scaleway Secret Manager vers les secrets Kubernetes au moment de l'exécution — les identifiants ne sont jamais intégrés dans les manifestes ou les images de conteneurs
+  - *Code :* [`k8s/external-secrets/`](k8s/external-secrets/)
+- **Aucun identifiant en dur :** tous les identifiants (clés API, mots de passe) proviennent de variables d'environnement ou de Secret Manager — jamais commités dans le code
   - *Code :* `.env.example` pour le modèle d'identifiants, `.gitignore` exclut `.env`
-- Les sorties Terraform sensibles sont marquées `sensitive = true` pour empêcher toute exposition accidentelle dans les logs
+- **Sorties sensibles :** les sorties Terraform contenant des secrets sont marquées `sensitive = true` pour empêcher toute exposition accidentelle dans les logs
   - *Code :* [`infrastructure/modules/kapsule/outputs.tf`](infrastructure/modules/kapsule/outputs.tf) — sortie kubeconfig
   - *Code :* [`infrastructure/modules/database/variables.tf`](infrastructure/modules/database/variables.tf) — variable mot de passe
+- **Validation stricte :** Terragrunt échoue immédiatement si les secrets requis (ex. `TF_VAR_db_password`) ne sont pas définis — aucune valeur par défaut
 
 ### Audit & Traçabilité
 
