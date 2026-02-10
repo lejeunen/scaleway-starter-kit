@@ -33,7 +33,7 @@ for var in SCW_ACCESS_KEY SCW_SECRET_KEY SCW_DEFAULT_PROJECT_ID KUBECONFIG; do
     fi
 done
 
-for cmd in kubectl terragrunt jq envsubst; do
+for cmd in kubectl terragrunt jq helm; do
     if ! command -v "$cmd" &>/dev/null; then
         err "Required command '$cmd' is not found"
         exit 1
@@ -90,11 +90,30 @@ kubectl create secret docker-registry registry-secret \
     --dry-run=client -o yaml | kubectl apply -f -
 ok "Registry pull secret created"
 
-# --- Apply ClusterSecretStore (substitute project ID) ---
+# --- Apply ClusterSecretStore ---
 
 info "Applying ClusterSecretStore..."
-export SCW_DEFAULT_PROJECT_ID
-envsubst < "$K8S_DIR/external-secrets/cluster-secret-store.yaml" | kubectl apply -f -
+cat <<EOF | kubectl apply -f -
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: scaleway-secret-store
+spec:
+  provider:
+    scaleway:
+      region: fr-par
+      projectId: "$SCW_DEFAULT_PROJECT_ID"
+      accessKey:
+        secretRef:
+          name: scaleway-api-credentials
+          namespace: external-secrets
+          key: access-key
+      secretKey:
+        secretRef:
+          name: scaleway-api-credentials
+          namespace: external-secrets
+          key: secret-key
+EOF
 ok "ClusterSecretStore applied"
 
 # --- Apply ExternalSecret ---
@@ -103,12 +122,17 @@ info "Applying ExternalSecret..."
 kubectl apply -f "$K8S_DIR/external-secrets/external-secret.yaml"
 ok "ExternalSecret applied"
 
-# --- Apply ConfigMap (substitute DB connection details) ---
+# --- Create app ConfigMap ---
 
-info "Applying app ConfigMap..."
-export DB_ENDPOINT_IP DB_ENDPOINT_PORT
-envsubst < "$K8S_DIR/app/configmap.yaml" | kubectl apply -f -
-ok "ConfigMap applied"
+info "Creating app ConfigMap..."
+kubectl create configmap app-config \
+    --namespace sovereign-wisdom \
+    --from-literal=db-host="$DB_ENDPOINT_IP" \
+    --from-literal=db-port="$DB_ENDPOINT_PORT" \
+    --from-literal=db-name="app" \
+    --from-literal=db-user="app_admin" \
+    --dry-run=client -o yaml | kubectl apply -f -
+ok "ConfigMap created"
 
 # --- Apply Deployment and Service ---
 

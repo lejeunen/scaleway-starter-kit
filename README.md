@@ -80,10 +80,8 @@ infrastructure/
 k8s/                               # Kubernetes manifests
 ├── namespace.yaml
 ├── external-secrets/              # External Secrets Operator config
-│   ├── cluster-secret-store.yaml
 │   └── external-secret.yaml
 └── app/                           # Application deployment
-    ├── configmap.yaml
     ├── deployment.yaml
     └── service.yaml
 
@@ -164,35 +162,52 @@ kubectl get nodes
 
 ### 5. Deploy the application
 
-The starter kit includes Kubernetes manifests for [Sovereign Cloud Wisdom](https://github.com/TODO/sovereign-cloud-wisdom), a demo application that serves curated wisdom about European digital sovereignty.
+The starter kit includes Kubernetes manifests for **Sovereign Cloud Wisdom**, a demo application that serves curated wisdom about European digital sovereignty. The app source code lives in a separate repository.
 
 **Prerequisites:**
 - The app Docker image must be built and pushed to the Container Registry (see the app repository)
 - [Helm](https://helm.sh/) must be installed (for External Secrets Operator)
 
-**Deploy using the helper script:**
+**Run the deployment script:**
 
 ```bash
-source .env
 ./scripts/deploy.sh
 ```
 
 The script will:
-1. Install External Secrets Operator (if not already present)
-2. Create the necessary Kubernetes secrets (registry credentials, Scaleway API access)
-3. Apply all manifests (namespace, secret store, app deployment, service)
-4. Display the Kapsule node IPs to configure in the load balancer backend
+1. Install [External Secrets Operator](https://external-secrets.io/) (if not already present)
+2. Create Kubernetes secrets (registry pull credentials, Scaleway API access for ESO)
+3. Create a `ClusterSecretStore` pointing to Scaleway Secret Manager
+4. Sync the database password as a Kubernetes secret via `ExternalSecret`
+5. Create the app `ConfigMap` with database connection details (fetched from Terragrunt outputs)
+6. Deploy the application (Deployment + NodePort Service on port 30080)
+7. Print the Kapsule node IPs for load balancer configuration
 
-**Update the load balancer backend:**
+**Wire the load balancer:**
 
-After deployment, update `infrastructure/dev/load-balancer/terragrunt.hcl` with the node IPs printed by the script, then:
+The script prints the node IPs at the end. Update `infrastructure/dev/load-balancer/terragrunt.hcl`:
+
+```hcl
+backend_server_ips = ["10.x.x.x", "10.x.x.x"]
+```
+
+Then apply:
 
 ```bash
 cd infrastructure/dev/load-balancer
 terragrunt apply
 ```
 
-The application is then accessible via the load balancer's public IP.
+**Verify:**
+
+```bash
+# Get the load balancer public IP
+cd infrastructure/dev/load-balancer
+terragrunt output lb_ip
+
+# Get a random piece of sovereign cloud wisdom
+curl http://<lb-ip>/
+```
 
 ## Adding a New Environment
 
