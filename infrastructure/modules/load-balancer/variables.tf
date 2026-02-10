@@ -48,3 +48,9 @@ variable "backend_server_ips" {
   type        = list(string)
   default     = []
 }
+
+variable "domain_name" {
+  description = "Domain name for DNS and Let's Encrypt certificate. Leave empty to skip DNS/TLS."
+  type        = string
+  default     = ""
+}

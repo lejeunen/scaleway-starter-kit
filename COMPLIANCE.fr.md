@@ -104,6 +104,7 @@ Toutes les ressources d'infrastructure de ce projet sont déployées exclusiveme
 | Load Balancer                 | —                | `fr-par-1` |
 | Secret Manager                | `fr-par`         | —          |
 | Container Registry            | `fr-par`         | —          |
+| DNS (Enregistrements domaine) | Scaleway DNS     | —          |
 | État Terraform (S3)           | `fr-par`         | —          |
 
 Aucune donnée ne quitte le territoire français. Les datacenters parisiens de Scaleway (DC2-DC5) sont situés en Île-de-France.
@@ -113,7 +114,7 @@ Aucune donnée ne quitte le territoire français. Les datacenters parisiens de S
 ### Sécurité réseau
 
 ```
-Internet → Load Balancer (IP publique) → Réseau Privé (172.16.0.0/22) → Kapsule / PostgreSQL
+Internet → Load Balancer (HTTPS/443) → Réseau Privé (172.16.0.0/22) → Kapsule / PostgreSQL
 ```
 
 - **Isolation VPC :** toutes les ressources internes communiquent via un réseau privé
@@ -122,6 +123,8 @@ Internet → Load Balancer (IP publique) → Réseau Privé (172.16.0.0/22) → 
   - *Code :* [`infrastructure/modules/kapsule/main.tf`](infrastructure/modules/kapsule/main.tf) — `cni = "cilium"`
 - **Health checks :** le load balancer effectue des vérifications HTTP pour s'assurer que seuls les backends sains reçoivent du trafic
   - *Code :* [`infrastructure/modules/load-balancer/main.tf`](infrastructure/modules/load-balancer/main.tf)
+- **Gestion DNS :** les enregistrements DNS du domaine sont gérés en tant que code via Terraform, garantissant l'auditabilité
+  - *Code :* [`infrastructure/modules/load-balancer/main.tf`](infrastructure/modules/load-balancer/main.tf) — `scaleway_domain_record`
 
 ### Chiffrement
 
@@ -135,7 +138,8 @@ Internet → Load Balancer (IP publique) → Réseau Privé (172.16.0.0/22) → 
 
 - **Communication provider :** tous les appels API Scaleway utilisent TLS 1.2+
 - **API Kubernetes :** accessible uniquement via HTTPS (kubeconfig utilise TLS)
-- **Load balancer :** supporte la terminaison HTTPS (à configurer par application)
+- **Load balancer :** terminaison TLS avec certificats Let's Encrypt et renouvellement automatique. Tout le trafic HTTP est redirigé vers HTTPS (301). La gestion des certificats est assurée par le service load balancer de Scaleway.
+  - *Code :* [`infrastructure/modules/load-balancer/main.tf`](infrastructure/modules/load-balancer/main.tf) — `scaleway_lb_certificate` et frontend HTTPS
 
 ### Gestion des secrets
 

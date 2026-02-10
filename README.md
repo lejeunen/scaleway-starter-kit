@@ -8,7 +8,7 @@ An infrastructure starter kit for [Scaleway](https://www.scaleway.com/), built w
                 Internet
                    │
               ┌────┴────┐
-              │  Load   │  ← Only public-facing resource
+              │  Load   │  ← HTTPS (Let's Encrypt) — only public-facing resource
               │Balancer │
               └────┬────┘
                    │
@@ -41,7 +41,7 @@ An infrastructure starter kit for [Scaleway](https://www.scaleway.com/), built w
 | **VPC + Private Network** | Isolated network with a `172.16.0.0/22` subnet. All resources communicate over private IPs only. | Network isolation for all internal resources |
 | **Kapsule** | Managed Kubernetes cluster with Cilium CNI, autoscaling (1–3 nodes), and autohealing. | Attached to private network, no public node exposure |
 | **PostgreSQL** | Managed database (PostgreSQL 16) with automated backups (daily, 7-day retention). | Private network only — no public endpoint. Password managed via Secret Manager. |
-| **Load Balancer** | Public HTTP load balancer with health checks, connected to the private network. | The only externally reachable component |
+| **Load Balancer** | Public load balancer with HTTPS (Let's Encrypt), HTTP→HTTPS redirect, and health checks. Connected to the private network. | TLS termination at the LB. The only externally reachable component. |
 | **Secret Manager** | Stores database credentials securely. Synced to Kubernetes via External Secrets Operator. | Secrets never hardcoded, injected at runtime |
 | **Container Registry** | Private Docker image registry hosted on Scaleway. | Images stored in France, private access only |
 
@@ -198,11 +198,12 @@ terragrunt apply
 **Verify:**
 
 ```bash
-# Get the load balancer public IP
-LB_IP=$(cd infrastructure/dev/load-balancer && terragrunt output -raw lb_ip)
+# Using the custom domain
+curl https://sovereigncloudwisdom.eu/
 
-# Get a random piece of sovereign cloud wisdom
-curl http://$LB_IP/
+# Or via IP (HTTP, will redirect to HTTPS if domain is configured)
+LB_IP=$(cd infrastructure/dev/load-balancer && terragrunt output -raw lb_ip)
+curl -L http://$LB_IP/
 ```
 
 ## Adding a New Environment
@@ -275,7 +276,6 @@ For details on how this project addresses GDPR, SecNumCloud, NIS2, and DORA requ
 
 This starter kit is a foundation, not a turnkey production setup. You would still need to add:
 
-- **TLS/HTTPS** termination on the load balancer
 - **Monitoring & observability** (Prometheus, Grafana, etc.)
 - **GitOps** workflow (ArgoCD, Flux)
 - **CI/CD** pipeline for infrastructure and application

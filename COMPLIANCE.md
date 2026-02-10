@@ -104,6 +104,7 @@ All infrastructure resources in this project are deployed exclusively in **Franc
 | Load Balancer                 | —               | `fr-par-1` |
 | Secret Manager                | `fr-par`        | —          |
 | Container Registry            | `fr-par`        | —          |
+| DNS (Domain Records)          | Scaleway DNS    | —          |
 | Terraform State (S3)          | `fr-par`        | —          |
 
 No data leaves French territory. Scaleway's Paris datacenters (DC2-DC5) are located in the Île-de-France region.
@@ -113,7 +114,7 @@ No data leaves French territory. Scaleway's Paris datacenters (DC2-DC5) are loca
 ### Network Security
 
 ```
-Internet → Load Balancer (Public IP) → Private Network (172.16.0.0/22) → Kapsule / PostgreSQL
+Internet → Load Balancer (HTTPS/443) → Private Network (172.16.0.0/22) → Kapsule / PostgreSQL
 ```
 
 - **VPC isolation:** All internal resources communicate over a private network
@@ -122,6 +123,8 @@ Internet → Load Balancer (Public IP) → Private Network (172.16.0.0/22) → K
   - *Code:* [`infrastructure/modules/kapsule/main.tf`](infrastructure/modules/kapsule/main.tf) — `cni = "cilium"`
 - **Health checks:** Load balancer performs HTTP health checks to ensure only healthy backends receive traffic
   - *Code:* [`infrastructure/modules/load-balancer/main.tf`](infrastructure/modules/load-balancer/main.tf)
+- **DNS management:** Domain DNS records managed as code via Terraform, ensuring auditability
+  - *Code:* [`infrastructure/modules/load-balancer/main.tf`](infrastructure/modules/load-balancer/main.tf) — `scaleway_domain_record`
 
 ### Encryption
 
@@ -135,7 +138,8 @@ Internet → Load Balancer (Public IP) → Private Network (172.16.0.0/22) → K
 
 - **Provider communication:** All Scaleway API calls use TLS 1.2+
 - **Kubernetes API:** Accessible via HTTPS only (kubeconfig uses TLS)
-- **Load balancer:** Supports HTTPS termination (to be configured per application)
+- **Load balancer:** TLS termination using Let's Encrypt certificates with automatic renewal. All HTTP traffic is redirected to HTTPS (301). Certificate management is handled by Scaleway's load balancer service.
+  - *Code:* [`infrastructure/modules/load-balancer/main.tf`](infrastructure/modules/load-balancer/main.tf) — `scaleway_lb_certificate` and HTTPS frontend
 
 ### Credentials Management
 
