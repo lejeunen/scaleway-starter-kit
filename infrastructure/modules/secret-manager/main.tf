@@ -6,5 +6,5 @@ resource "scaleway_secret" "this" {
 
 resource "scaleway_secret_version" "this" {
   secret_id = scaleway_secret.this.id
-  data      = base64encode(var.secret_data)
+  data      = var.secret_data
 }
