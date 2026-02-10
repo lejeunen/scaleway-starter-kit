@@ -1,6 +1,6 @@
 # Scaleway Starter Kit
 
-A production-ready infrastructure starter kit for [Scaleway](https://www.scaleway.com/), built with **Terragrunt** and **OpenTofu**. Designed as a reference architecture demonstrating best practices for deploying a secure, multi-environment cloud platform.
+An infrastructure starter kit for [Scaleway](https://www.scaleway.com/), built with **Terragrunt** and **OpenTofu**. A learning tool and starting point for deploying a secure, sovereign cloud platform on a European provider.
 
 ## Architecture
 
@@ -39,7 +39,7 @@ A production-ready infrastructure starter kit for [Scaleway](https://www.scalewa
 | Component | Description | Security |
 |-----------|-------------|----------|
 | **VPC + Private Network** | Isolated network with a `172.16.0.0/22` subnet. All resources communicate over private IPs only. | Network isolation for all internal resources |
-| **Kapsule** | Managed Kubernetes cluster with Cilium CNI, autoscaling (1–3 nodes), automatic upgrades, and autohealing. | Attached to private network, no public node exposure |
+| **Kapsule** | Managed Kubernetes cluster with Cilium CNI, autoscaling (1–3 nodes), and autohealing. | Attached to private network, no public node exposure |
 | **PostgreSQL** | Managed database (PostgreSQL 16) with automated backups (daily, 7-day retention). | Private network only — no public endpoint. Password managed via Secret Manager. |
 | **Load Balancer** | Public HTTP load balancer with health checks, connected to the private network. | The only externally reachable component |
 | **Secret Manager** | Stores database credentials securely. Synced to Kubernetes via External Secrets Operator. | Secrets never hardcoded, injected at runtime |
@@ -90,7 +90,7 @@ scripts/
 └── deploy.sh                      # Application deployment to Kapsule
 ```
 
-The project uses **Pattern A** (environment-agnostic root): `root.hcl` contains no environment-specific references, making it easy to add `staging/` or `prod/` directories with their own `env.hcl`.
+The root Terragrunt config (`root.hcl`) is environment-agnostic — all environment-specific values live in `env.hcl`. To add a new environment (staging, prod), just create a new directory with its own `env.hcl`.
 
 ## Prerequisites
 
@@ -98,6 +98,7 @@ The project uses **Pattern A** (environment-agnostic root): `root.hcl` contains 
 - [Terragrunt](https://terragrunt.gruntwork.io/) >= 0.93.0
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
 - [Helm](https://helm.sh/) (for External Secrets Operator)
+- [jq](https://jqlang.github.io/jq/)
 - A Scaleway account with API credentials
 
 ## Getting Started
@@ -115,13 +116,14 @@ In the [Scaleway console](https://console.scaleway.com/), create an Object Stora
 cp .env.example .env
 ```
 
-Edit `.env` with your Scaleway credentials:
+Edit `.env` with your Scaleway credentials and database password:
 
 ```bash
 export SCW_ACCESS_KEY=<your-access-key>
 export SCW_SECRET_KEY=<your-secret-key>
 export SCW_DEFAULT_ORGANIZATION_ID=<your-org-id>
 export SCW_DEFAULT_PROJECT_ID=<your-project-id>
+export TF_VAR_db_password=<a-secure-password>
 export KUBECONFIG="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/infrastructure/dev/.kubeconfig"
 ```
 
@@ -134,10 +136,6 @@ source .env
 ### 3. Deploy the infrastructure
 
 ```bash
-# Set the database password
-export TF_VAR_db_password="<a-secure-password>"
-
-# Deploy all modules (respects dependency order)
 cd infrastructure/dev
 terragrunt run --all apply
 ```
@@ -164,9 +162,7 @@ kubectl get nodes
 
 The starter kit includes Kubernetes manifests for **Sovereign Cloud Wisdom**, a demo application that serves curated wisdom about European digital sovereignty. The app source code lives in a separate repository.
 
-**Prerequisites:**
-- The app Docker image must be built and pushed to the Container Registry (see the app repository)
-- [Helm](https://helm.sh/) must be installed (for External Secrets Operator)
+The app Docker image must be built and pushed to the Container Registry first (see the app repository).
 
 **Run the deployment script:**
 
@@ -202,11 +198,10 @@ terragrunt apply
 
 ```bash
 # Get the load balancer public IP
-cd infrastructure/dev/load-balancer
-terragrunt output lb_ip
+LB_IP=$(cd infrastructure/dev/load-balancer && terragrunt output -raw lb_ip)
 
 # Get a random piece of sovereign cloud wisdom
-curl http://<lb-ip>/
+curl http://$LB_IP/
 ```
 
 ## Adding a New Environment
@@ -266,6 +261,27 @@ To validate a different environment:
 ```bash
 ./scripts/validate.sh infrastructure/staging
 ```
+
+## Compliance & Sovereignty
+
+This project is designed with European data sovereignty in mind. All resources are deployed exclusively in France (`fr-par`), using Scaleway — a French cloud provider not subject to the US CLOUD Act.
+
+For details on how this project addresses GDPR, SecNumCloud, NIS2, and DORA requirements, see:
+- [COMPLIANCE.md](COMPLIANCE.md) (English)
+- [COMPLIANCE.fr.md](COMPLIANCE.fr.md) (French)
+
+## What's Not Included
+
+This starter kit is a foundation, not a turnkey production setup. You would still need to add:
+
+- **TLS/HTTPS** termination on the load balancer
+- **Monitoring & observability** (Prometheus, Grafana, etc.)
+- **GitOps** workflow (ArgoCD, Flux)
+- **CI/CD** pipeline for infrastructure and application
+- **Ingress controller** for path-based routing
+- **Network policies** for fine-grained pod-to-pod traffic control
+- **Backup strategy** beyond the managed database backups
+- And more, depending on your specific requirements
 
 ## Tear Down
 
