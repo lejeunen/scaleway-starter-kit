@@ -279,6 +279,10 @@ To validate a different environment:
 
 This project is designed with European data sovereignty in mind. All resources are deployed exclusively in France (`fr-par`), using Scaleway — a French cloud provider not subject to US extraterritorial surveillance laws (CLOUD Act, FISA Section 702).
 
+For a non-technical overview of why sovereign cloud matters, see:
+- [WHY-SOVEREIGN-CLOUD.md](WHY-SOVEREIGN-CLOUD.md) (English)
+- [WHY-SOVEREIGN-CLOUD.fr.md](WHY-SOVEREIGN-CLOUD.fr.md) (French)
+
 For details on how this project addresses GDPR, SecNumCloud, NIS2, and DORA requirements, see:
 - [COMPLIANCE.md](COMPLIANCE.md) (English)
 - [COMPLIANCE.fr.md](COMPLIANCE.fr.md) (French)
