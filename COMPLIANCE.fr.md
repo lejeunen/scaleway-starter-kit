@@ -6,6 +6,7 @@ Ce projet est conçu pour répondre aux exigences européennes en matière de so
 
 - [Cadre juridique](#cadre-juridique)
   - [Surveillance extraterritoriale américaine](#surveillance-extraterritoriale-américaine)
+  - [Offres « cloud de confiance » des hyperscalers américains](#offres--cloud-de-confiance--des-hyperscalers-américains)
   - [Souveraineté numérique européenne](#souveraineté-numérique-européenne)
   - [SecNumCloud](#secnumcloud)
   - [RGPD](#rgpd)
@@ -39,6 +40,23 @@ Ces lois entrent directement en conflit avec :
 - **L'arrêt Schrems II** (CJUE, juillet 2020), qui a invalidé le Privacy Shield UE-US en raison des préoccupations liées à la surveillance américaine des données des citoyens européens
 
 En utilisant un **fournisseur cloud européen** non soumis à la juridiction américaine, ce projet élimine le conflit juridique structurel entre les lois de surveillance américaines et le RGPD.
+
+### Offres « cloud de confiance » des hyperscalers américains
+
+Face à la demande croissante de souveraineté numérique en Europe, les hyperscalers américains ont lancé des régions « cloud souverain » dédiées :
+
+- **AWS European Sovereign Cloud** (2025) — Infrastructure AWS distincte en Allemagne, opérée par une entité juridique allemande avec du personnel et une direction exclusivement résidents de l'UE. AWS a investi 7,8 milliards d'euros dans cette initiative.
+- **Google Sovereign Cloud** — Partenariats avec des opérateurs locaux (T-Systems en Allemagne, Thales en France) pour des environnements co-opérés.
+- **Microsoft Azure Confidential Computing** — Diverses fonctionnalités de souveraineté, incluant des engagements de périmètre de données UE.
+
+Ces offres apportent de véritables garanties **opérationnelles** : résidence des données, personnel exclusivement européen, comités de gouvernance indépendants. Cependant, elles ne résolvent pas le **risque juridique** :
+
+- **Propriété capitalistique** : les filiales européennes sont in fine détenues par des sociétés mères américaines. Le CLOUD Act s'applique aux données en « possession, custody, or control » (possession, garde ou contrôle) des entreprises américaines — et la propriété d'une filiale constitue un argument fort en faveur du contrôle.
+- **Non testé en justice** : aucun tribunal ne s'est prononcé sur la capacité d'une filiale européenne spécifiquement structurée à résister à une injonction CLOUD Act. La plupart des juristes européens et le **CEPD** (Comité Européen de la Protection des Données) considèrent que le risque subsiste.
+- **Ordonnances classifiées** : les ordonnances des tribunaux FISA sont secrètes par nature. Il n'existe aucun mécanisme pour vérifier si une société mère américaine a ordonné à sa filiale européenne de se conformer à une demande de surveillance classifiée.
+- **Exclusion SecNumCloud** : la certification SecNumCloud 3.2 de l'ANSSI exige explicitement une protection contre les juridictions extra-européennes. Les filiales d'entreprises américaines ne peuvent pas obtenir cette qualification, indépendamment des mesures opérationnelles mises en place.
+
+La distinction est celle entre **certitude juridique** et **risque juridique** : un fournisseur européen élimine entièrement la question juridictionnelle, tandis qu'un « cloud souverain » américain repose sur une théorie juridique non testée selon laquelle la séparation opérationnelle prévaut sur la lien capitalistique.
 
 ### Souveraineté numérique européenne
 

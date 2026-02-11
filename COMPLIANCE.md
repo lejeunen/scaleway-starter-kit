@@ -6,6 +6,7 @@ This project is designed to meet European data sovereignty and regulatory requir
 
 - [Legal Framework](#legal-framework)
   - [US Extraterritorial Surveillance](#us-extraterritorial-surveillance)
+  - [US Hyperscaler "Sovereign Cloud" Offerings](#us-hyperscaler-sovereign-cloud-offerings)
   - [European Digital Sovereignty](#european-digital-sovereignty)
   - [SecNumCloud](#secnumcloud)
   - [GDPR / RGPD](#gdpr--rgpd)
@@ -39,6 +40,23 @@ These laws directly conflict with:
 - The **Schrems II ruling** (CJEU, July 2020), which invalidated the EU-US Privacy Shield over concerns about US surveillance of EU citizens' data
 
 By using a **European cloud provider** not subject to US jurisdiction, this project eliminates the structural legal conflict between US surveillance laws and GDPR.
+
+### US Hyperscaler "Sovereign Cloud" Offerings
+
+In response to growing European demand for data sovereignty, US hyperscalers have launched dedicated "sovereign cloud" regions:
+
+- **AWS European Sovereign Cloud** (2025) — A separate AWS infrastructure in Germany, operated through a German legal entity with EU-resident staff and management. AWS invested €7.8 billion in this initiative.
+- **Google Sovereign Cloud** — Partnerships with local operators (T-Systems in Germany, Thales in France) to provide jointly operated environments.
+- **Microsoft Azure Confidential Computing** — Various sovereignty features including EU Data Boundary commitments.
+
+These offerings provide genuine **operational** safeguards: data residency, EU-only personnel, independent governance boards. However, they do not resolve the **legal** risk:
+
+- **Corporate ownership**: The European subsidiaries are ultimately owned by US parent companies. The CLOUD Act applies to data within the "possession, custody, or control" of US companies — and ownership of a subsidiary is a strong argument for control.
+- **Untested in court**: No court has ruled on whether a specifically-structured European subsidiary of a US company can resist a CLOUD Act order. Most EU legal experts and the **EDPB** (European Data Protection Board) consider the risk remains.
+- **Classified orders**: FISA court orders are secret by design. There is no mechanism to verify whether a US parent company has directed its European subsidiary to comply with a classified surveillance request.
+- **SecNumCloud exclusion**: France's SecNumCloud 3.2 certification explicitly requires protection against non-European jurisdictions. Subsidiaries of US companies cannot qualify, regardless of operational safeguards.
+
+The distinction is between **legal certainty** and **legal risk**: a European-owned provider eliminates the jurisdictional question entirely, while a US-owned "sovereign cloud" relies on an untested legal theory that operational separation overrides corporate ownership.
 
 ### European Digital Sovereignty
 
