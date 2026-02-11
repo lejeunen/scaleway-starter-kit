@@ -44,6 +44,7 @@ An infrastructure starter kit for [Scaleway](https://www.scaleway.com/), built w
 | **Load Balancer** | Public load balancer with HTTPS (Let's Encrypt), HTTP→HTTPS redirect, and health checks. Connected to the private network. | TLS termination at the LB. The only externally reachable component. |
 | **Secret Manager** | Stores database credentials securely. Synced to Kubernetes via External Secrets Operator. | Secrets never hardcoded, injected at runtime |
 | **Container Registry** | Private Docker image registry hosted on Scaleway. | Images stored in France, private access only |
+| **Cockpit** | Managed observability platform (Grafana, Mimir, Loki, Tempo). Kapsule metrics collected automatically. | Data stays in France, managed by Scaleway |
 
 ### Dependency Graph
 
@@ -54,6 +55,7 @@ vpc
 
 secret-manager   (independent)
 registry         (independent)
+cockpit          (independent)
 ```
 
 ## Project Structure
@@ -67,7 +69,8 @@ infrastructure/
 │   ├── database/                  # PostgreSQL managed database
 │   ├── load-balancer/             # Public load balancer
 │   ├── secret-manager/            # Scaleway Secret Manager
-│   └── registry/                  # Scaleway Container Registry
+│   ├── registry/                  # Scaleway Container Registry
+│   └── cockpit/                   # Scaleway Cockpit (observability)
 └── dev/                           # Dev environment
     ├── env.hcl                    # Environment-specific variables
     ├── vpc/terragrunt.hcl
@@ -75,7 +78,8 @@ infrastructure/
     ├── database/terragrunt.hcl
     ├── load-balancer/terragrunt.hcl
     ├── secret-manager/terragrunt.hcl
-    └── registry/terragrunt.hcl
+    ├── registry/terragrunt.hcl
+    └── cockpit/terragrunt.hcl
 
 k8s/                               # Kubernetes manifests
 ├── namespace.yaml
@@ -217,6 +221,17 @@ LB_IP=$(cd infrastructure/dev/load-balancer && terragrunt output -raw lb_ip)
 curl -L http://$LB_IP/
 ```
 
+### 7. Access the Grafana dashboard
+
+Cockpit is Scaleway's managed observability platform. Kapsule metrics are collected automatically at no cost.
+
+```bash
+cd infrastructure/dev/cockpit
+terragrunt output grafana_url
+```
+
+Open the Grafana URL and log in with your Scaleway IAM credentials. Pre-configured dashboards for Kapsule are available under the Scaleway folder.
+
 ## Adding a New Environment
 
 1. Create a new environment directory:
@@ -232,7 +247,7 @@ curl -L http://$LB_IP/
 
 3. Copy the child module configs (they're identical — all values come from `env.hcl`):
    ```bash
-   for module in vpc kapsule database load-balancer secret-manager registry; do
+   for module in vpc kapsule database load-balancer secret-manager registry cockpit; do
      mkdir -p "infrastructure/staging/$module"
      cp "infrastructure/dev/$module/terragrunt.hcl" "infrastructure/staging/$module/"
    done
@@ -291,7 +306,6 @@ For details on how this project addresses GDPR, SecNumCloud, NIS2, and DORA requ
 
 This starter kit is a foundation, not a turnkey production setup. You would still need to add:
 
-- **Monitoring & observability** (Prometheus, Grafana, etc.)
 - **GitOps** workflow (ArgoCD, Flux)
 - **CI/CD** pipeline for infrastructure and application
 - **Ingress controller** for path-based routing

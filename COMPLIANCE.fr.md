@@ -122,6 +122,7 @@ Toutes les ressources d'infrastructure de ce projet sont déployées exclusiveme
 | Load Balancer                 | —                | `fr-par-1` |
 | Secret Manager                | `fr-par`         | —          |
 | Container Registry            | `fr-par`         | —          |
+| Cockpit (Observabilité)       | `fr-par`         | —          |
 | DNS (Enregistrements domaine) | Scaleway DNS     | —          |
 | État Terraform (S3)           | `fr-par`         | —          |
 
@@ -177,6 +178,8 @@ Internet → Load Balancer (HTTPS/443) → Réseau Privé (172.16.0.0/22) → Ka
 - **Infrastructure as Code :** toute l'infrastructure est définie en Terraform/Terragrunt — chaque modification est versionnée dans Git, fournissant une piste d'audit complète
 - **Tagging des ressources :** toutes les ressources sont taguées avec l'environnement, le projet et l'outil de gestion pour la traçabilité
   - Tags : `env:dev`, `project:scaleway-starter-kit`, `managed-by:terragrunt`
+- **Observabilité :** Scaleway Cockpit fournit des métriques, logs et traces managés via des tableaux de bord Grafana — toutes les données stockées en France
+  - *Code :* [`infrastructure/modules/cockpit/main.tf`](infrastructure/modules/cockpit/main.tf)
 - **Pipeline de validation :** le script [`scripts/validate.sh`](scripts/validate.sh) exécute :
   - Vérification du formatage HCL
   - Validation Terraform

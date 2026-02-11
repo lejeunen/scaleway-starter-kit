@@ -122,6 +122,7 @@ All infrastructure resources in this project are deployed exclusively in **Franc
 | Load Balancer                 | —               | `fr-par-1` |
 | Secret Manager                | `fr-par`        | —          |
 | Container Registry            | `fr-par`        | —          |
+| Cockpit (Observability)       | `fr-par`        | —          |
 | DNS (Domain Records)          | Scaleway DNS    | —          |
 | Terraform State (S3)          | `fr-par`        | —          |
 
@@ -177,6 +178,8 @@ Internet → Load Balancer (HTTPS/443) → Private Network (172.16.0.0/22) → K
 - **Infrastructure as Code:** All infrastructure is defined in Terraform/Terragrunt — every change is versioned in Git, providing a complete audit trail
 - **Resource tagging:** All resources are tagged with environment, project, and management tool for traceability
   - Tags: `env:dev`, `project:scaleway-starter-kit`, `managed-by:terragrunt`
+- **Observability:** Scaleway Cockpit provides managed metrics, logs, and traces via Grafana dashboards — all data stored in France
+  - *Code:* [`infrastructure/modules/cockpit/main.tf`](infrastructure/modules/cockpit/main.tf)
 - **Validation pipeline:** The [`scripts/validate.sh`](scripts/validate.sh) script runs:
   - HCL format checking
   - Terraform validation
