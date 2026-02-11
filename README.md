@@ -164,18 +164,17 @@ terragrunt output -json kubeconfig | jq -r '.[0].config_file' > ../.kubeconfig
 chmod 600 ../.kubeconfig
 ```
 
-Then reload your environment:
+Then connect to the cluster:
 
 ```bash
-source .env
 kubectl get nodes
 ```
 
 ### 6. Deploy the application
 
-The starter kit includes Kubernetes manifests for **Sovereign Cloud Wisdom**, a demo application that serves curated wisdom about European digital sovereignty. The app source code lives in a separate repository.
+The starter kit includes Kubernetes manifests for [**Sovereign Cloud Wisdom**](https://github.com/lejeunen/sovereign-cloud-wisdom), a demo application that serves curated wisdom about European digital sovereignty.
 
-The app Docker image must be built and pushed to the Container Registry first (see the app repository).
+The app Docker image must be built and pushed to the Container Registry first (see the [app repository](https://github.com/lejeunen/sovereign-cloud-wisdom)).
 
 **Run the deployment script:**
 
@@ -197,7 +196,7 @@ The script will:
 The script prints the node IPs at the end. Update `infrastructure/dev/load-balancer/terragrunt.hcl`:
 
 ```hcl
-backend_server_ips = ["172.16.x.x", "172.16.x.x"]
+backend_server_ips = ["172.16.x.x"]
 ```
 
 Then apply:

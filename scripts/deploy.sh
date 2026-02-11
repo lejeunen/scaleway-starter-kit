@@ -162,7 +162,7 @@ if [[ -n "$NODE_IPS" ]]; then
     echo ""
     echo "  backend_server_ips = [$(echo "$NODE_IPS" | tr ' ' '\n' | sed 's/.*/"&"/' | paste -sd, -)]"
     echo ""
-    echo "Then run: cd infrastructure/dev/load-balancer && terragrunt apply"
+    echo "Then run: cd ../infrastructure/dev/load-balancer && terragrunt apply"
 else
     err "Could not retrieve node IPs"
 fi
