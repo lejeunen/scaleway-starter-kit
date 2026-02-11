@@ -310,6 +310,7 @@ This starter kit is a foundation, not a turnkey production setup. You would stil
 - **CI/CD** pipeline for infrastructure and application
 - **Ingress controller** for path-based routing
 - **Network policies** for fine-grained pod-to-pod traffic control
+- **Secure private network access** (VPN or bastion) for reaching internal resources like the database
 - **Backup strategy** beyond the managed database backups
 - And more, depending on your specific requirements
 
