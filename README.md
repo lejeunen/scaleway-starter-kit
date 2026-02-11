@@ -223,7 +223,7 @@ curl -L http://$LB_IP/
 
 ### 7. Access the Grafana dashboard
 
-Cockpit is Scaleway's managed observability platform. Kapsule metrics are collected automatically at no cost.
+Cockpit is Scaleway's managed observability platform. Kapsule metrics are collected automatically at no cost, and is very easy to set up.
 
 ```bash
 cd infrastructure/dev/cockpit
@@ -231,6 +231,8 @@ terragrunt output grafana_url
 ```
 
 Open the Grafana URL and log in with your Scaleway IAM credentials. Pre-configured dashboards for Kapsule are available under the Scaleway folder.
+
+![Grafana Kapsule Overview](docs/grafana-kapsule-overview.png)
 
 ## Adding a New Environment
 
