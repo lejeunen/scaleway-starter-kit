@@ -41,6 +41,7 @@ European regulations are creating mandatory demand for sovereign infrastructure:
 - **DORA** — Operational resilience requirements for the financial sector and their ICT providers
 - **SecNumCloud** — France's highest cloud security certification, increasingly required for public sector and sensitive data
 - **GDPR** — Data protection obligations that structurally conflict with US extraterritorial surveillance laws
+- **EU Cloud Sovereignty Framework** — The European Commission is formalizing a classification of cloud sovereignty levels, defining measurable criteria for what "sovereign" actually means
 
 Organizations that begin their migration now will have a competitive advantage when compliance deadlines arrive. Those that wait will be forced to move under time pressure.
 

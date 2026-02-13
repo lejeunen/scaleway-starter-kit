@@ -41,6 +41,7 @@ Les réglementations européennes créent une demande contraignante en matière 
 - **DORA** — Exigences de résilience opérationnelle pour le secteur financier et ses prestataires TIC
 - **SecNumCloud** — La plus haute certification de sécurité cloud en France, de plus en plus exigée pour le secteur public et les données sensibles
 - **RGPD** — Obligations de protection des données qui entrent structurellement en conflit avec les lois de surveillance extraterritoriale américaines
+- **EU Cloud Sovereignty Framework** — La Commission européenne formalise une classification des niveaux de souveraineté cloud, avec des critères mesurables pour définir ce que « souverain » signifie concrètement
 
 Les organisations qui entament leur migration dès maintenant auront un avantage compétitif à l'échéance des obligations de conformité. Celles qui attendent devront migrer dans l'urgence.
 
