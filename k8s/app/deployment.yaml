@@ -47,6 +47,18 @@ spec:
                 secretKeyRef:
                   name: db-credentials
                   key: db-password
+            - name: MATOMO_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: matomo-config
+                  key: matomo-url
+                  optional: true
+            - name: MATOMO_SITE_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: matomo-config
+                  key: matomo-site-id
+                  optional: true
             - name: API_AUTH_TOKEN
               valueFrom:
                 secretKeyRef:
