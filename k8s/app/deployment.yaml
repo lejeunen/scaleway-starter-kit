@@ -47,10 +47,11 @@ spec:
                 secretKeyRef:
                   name: db-credentials
                   key: db-password
-          volumeMounts:
-            - name: api-auth-token
-              mountPath: /etc/secrets/api-auth-token
-              readOnly: true
+            - name: API_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: api-auth-token
+                  key: api-token
           livenessProbe:
             httpGet:
               path: /health
@@ -70,9 +71,5 @@ spec:
             limits:
               cpu: 500m
               memory: 256Mi
-      volumes:
-        - name: api-auth-token
-          secret:
-            secretName: api-auth-token
       imagePullSecrets:
         - name: registry-secret
