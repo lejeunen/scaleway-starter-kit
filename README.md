@@ -77,7 +77,8 @@ infrastructure/
     ├── kapsule/terragrunt.hcl
     ├── database/terragrunt.hcl
     ├── load-balancer/terragrunt.hcl
-    ├── secret-manager/terragrunt.hcl
+    ├── secret-manager-db-password/terragrunt.hcl
+    ├── secret-manager-api-token/terragrunt.hcl
     ├── registry/terragrunt.hcl
     └── cockpit/terragrunt.hcl
 
