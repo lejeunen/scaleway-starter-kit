@@ -31,7 +31,8 @@ An infrastructure starter kit for [Scaleway](https://www.scaleway.com/), built w
      └───────────────────────────┘
 
      Secret Manager          Container Registry
-     (DB credentials)        (Docker images)
+     (DB credentials +       (Docker images)
+      API auth token)
 ```
 
 ### Components
@@ -42,7 +43,7 @@ An infrastructure starter kit for [Scaleway](https://www.scaleway.com/), built w
 | **Kapsule** | Managed Kubernetes cluster with Cilium CNI, autoscaling (1–3 nodes), and autohealing. | Attached to private network, no public node exposure |
 | **PostgreSQL** | Managed database (PostgreSQL 16) with automated backups (daily, 7-day retention). | Private network only — no public endpoint. Password managed via Secret Manager. |
 | **Load Balancer** | Public load balancer with HTTPS (Let's Encrypt), HTTP→HTTPS redirect, and health checks. Connected to the private network. | TLS termination at the LB. The only externally reachable component. |
-| **Secret Manager** | Stores database credentials securely. Synced to Kubernetes via External Secrets Operator. | Secrets never hardcoded, injected at runtime |
+| **Secret Manager** | Stores database credentials and API auth token. Synced to Kubernetes via External Secrets Operator. | Secrets never hardcoded, injected at runtime |
 | **Container Registry** | Private Docker image registry hosted on Scaleway. | Images stored in France, private access only |
 | **Cockpit** | Managed observability platform (Grafana, Mimir, Loki, Tempo). Kapsule metrics collected automatically. | Data stays in France, managed by Scaleway |
 
@@ -85,14 +86,16 @@ infrastructure/
 k8s/                               # Kubernetes manifests
 ├── namespace.yaml
 ├── external-secrets/              # External Secrets Operator config
-│   └── external-secret.yaml
+│   ├── external-secret.yaml       # DB password sync
+│   └── api-auth-token.yaml        # API auth token sync
 └── app/                           # Application deployment
     ├── deployment.yaml
     └── service.yaml
 
 scripts/
 ├── validate.sh                    # Validation & security scanning
-└── deploy.sh                      # Application deployment to Kapsule
+├── deploy.sh                      # Application deployment to Kapsule
+└── rotate-api-token.sh            # Manual API token rotation
 ```
 
 The root Terragrunt config (`root.hcl`) is environment-agnostic — all environment-specific values live in `env.hcl`. To add a new environment (staging, prod), just create a new directory with its own `env.hcl`.
@@ -129,6 +132,7 @@ export SCW_SECRET_KEY=<your-secret-key>
 export SCW_DEFAULT_ORGANIZATION_ID=<your-org-id>
 export SCW_DEFAULT_PROJECT_ID=<your-project-id>
 export TF_VAR_db_password=<a-secure-password>
+export TF_VAR_api_auth_token=<generate-with-openssl-rand-hex-32>
 export KUBECONFIG="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/infrastructure/dev/.kubeconfig"
 ```
 
@@ -191,10 +195,22 @@ The script will:
 1. Install [External Secrets Operator](https://external-secrets.io/) (if not already present)
 2. Create Kubernetes secrets (registry pull credentials, Scaleway API access for ESO)
 3. Create a `ClusterSecretStore` pointing to Scaleway Secret Manager
-4. Sync the database password as a Kubernetes secret via `ExternalSecret`
+4. Sync the database password and API auth token as Kubernetes secrets via `ExternalSecret`
 5. Create the app `ConfigMap` with database connection details (fetched from Terragrunt outputs)
 6. Deploy the application (Deployment + NodePort Service on port 30080)
 7. Print the Kapsule node IPs for load balancer configuration
+
+**Retrieve the API auth token** (for use in client applications):
+
+```bash
+kubectl get secret api-auth-token -n sovereign-wisdom -o jsonpath='{.data.api-token}' | base64 -d; echo
+```
+
+To rotate the token manually:
+
+```bash
+./scripts/rotate-api-token.sh
+```
 
 **Wire the load balancer:**
 
@@ -250,7 +266,7 @@ Open the Grafana URL and log in with your Scaleway IAM credentials. Pre-configur
 
 3. Copy the child module configs (they're identical — all values come from `env.hcl`):
    ```bash
-   for module in vpc kapsule database load-balancer secret-manager registry cockpit; do
+   for module in vpc kapsule database load-balancer secret-manager-db-password secret-manager-api-token registry cockpit; do
      mkdir -p "infrastructure/staging/$module"
      cp "infrastructure/dev/$module/terragrunt.hcl" "infrastructure/staging/$module/"
    done
