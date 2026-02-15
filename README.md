@@ -339,3 +339,5 @@ This starter kit is a foundation, not a turnkey production setup. You would stil
 cd infrastructure/dev
 terragrunt run --all destroy
 ```
+
+> **Note:** Scaleway secrets might survive `destroy`. Delete them manually (`scw secret secret delete <id>`) before redeploying, or you'll get a "cannot have same secret name" error.
