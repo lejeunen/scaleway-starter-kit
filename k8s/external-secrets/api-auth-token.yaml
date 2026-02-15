@@ -1,0 +1,17 @@
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: api-auth-token
+  namespace: sovereign-wisdom
+spec:
+  refreshInterval: 5m
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: scaleway-secret-store
+  target:
+    name: api-auth-token
+  data:
+    - secretKey: api-token
+      remoteRef:
+        key: "name:dev-api-auth-token"
+        version: latest_enabled

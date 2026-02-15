@@ -128,6 +128,12 @@ info "Applying ExternalSecret..."
 kubectl apply -f "$K8S_DIR/external-secrets/external-secret.yaml"
 ok "ExternalSecret applied"
 
+# --- Apply API auth token ExternalSecret ---
+
+info "Applying API auth token ExternalSecret..."
+kubectl apply -f "$K8S_DIR/external-secrets/api-auth-token.yaml"
+ok "API auth token ExternalSecret applied"
+
 # --- Create app ConfigMap ---
 
 info "Creating app ConfigMap..."

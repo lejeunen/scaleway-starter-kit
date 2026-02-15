@@ -34,7 +34,8 @@ locals {
   registry_name = "dev-sovereign-wisdom"
 
   # Secret Manager
-  secret_name = "dev-db-password"
+  secret_name           = "dev-db-password"
+  api_auth_token_secret = "dev-api-auth-token"
 
   # Load Balancer
   lb_name     = "dev-lb"

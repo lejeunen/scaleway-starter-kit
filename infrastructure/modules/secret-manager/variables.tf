@@ -20,3 +20,9 @@ variable "tags" {
   type        = list(string)
   default     = []
 }
+
+variable "externally_rotated" {
+  description = "If true, ignore secret data changes to avoid overwriting values rotated outside of Terraform."
+  type        = bool
+  default     = false
+}

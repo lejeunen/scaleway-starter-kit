@@ -10,5 +10,5 @@ output "secret_name" {
 
 output "version_id" {
   description = "ID of the secret version."
-  value       = scaleway_secret_version.this.id
+  value       = var.externally_rotated ? scaleway_secret_version.externally_rotated[0].id : scaleway_secret_version.this[0].id
 }
