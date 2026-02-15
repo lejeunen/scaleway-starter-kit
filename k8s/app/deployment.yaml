@@ -59,6 +59,12 @@ spec:
                   name: matomo-config
                   key: matomo-site-id
                   optional: true
+            - name: MATOMO_TOKEN_AUTH
+              valueFrom:
+                secretKeyRef:
+                  name: matomo-token-auth
+                  key: token
+                  optional: true
             - name: API_AUTH_TOKEN
               valueFrom:
                 secretKeyRef:
