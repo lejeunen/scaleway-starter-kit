@@ -43,6 +43,6 @@ inputs = {
   tags               = local.env.locals.tags
   backend_port       = 30080
   health_check_uri   = "/health"
-  backend_server_ips = ["172.16.0.4"]
+  backend_server_ips = ["172.16.0.6"]
   domain_name        = local.env.locals.domain_name
 }

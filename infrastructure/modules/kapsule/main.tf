@@ -9,9 +9,9 @@ resource "scaleway_k8s_cluster" "this" {
   delete_additional_resources = true
 
   auto_upgrade {
-    enable                        = var.auto_upgrade
-    maintenance_window_start_hour = var.upgrade_maintenance_window_start_hour
-    maintenance_window_day        = var.upgrade_maintenance_window_day
+    enable                        = false
+    maintenance_window_start_hour = 0
+    maintenance_window_day        = "any"
   }
 
   autoscaler_config {
