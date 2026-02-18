@@ -89,7 +89,7 @@ fi
 # cert-manager automates TLS certificate lifecycle:
 #   1. Watches for Ingress resources with cert-manager annotations
 #   2. Requests certificates from Let's Encrypt via ACME protocol
-#   3. Solves HTTP-01 challenges (proves domain ownership)
+#   3. Solves HTTP-01 or DNS-01 challenges (proves domain ownership)
 #   4. Stores certs as Kubernetes Secrets
 #   5. Auto-renews ~30 days before expiry
 #
@@ -108,6 +108,41 @@ if ! kubectl get namespace cert-manager &>/dev/null; then
     ok "cert-manager installed"
 else
     ok "cert-manager already installed"
+fi
+
+# --- Install cert-manager-webhook-scaleway ---
+#
+# Webhook solver for DNS-01 challenges via Scaleway DNS API.
+# Used for the apex domain (sovereigncloudwisdom.eu) where HTTP-01 fails
+# due to hairpin NAT + proxy protocol issues on Scaleway.
+#
+# The webhook creates/deletes TXT records (_acme-challenge.<domain>)
+# to prove domain ownership without any HTTP traffic.
+
+info "Creating Scaleway DNS credentials for cert-manager..."
+kubectl create secret generic scaleway-dns-credentials \
+    --namespace cert-manager \
+    --from-literal=SCW_ACCESS_KEY="$SCW_ACCESS_KEY" \
+    --from-literal=SCW_SECRET_KEY="$SCW_SECRET_KEY" \
+    --dry-run=client -o yaml | kubectl apply -f -
+ok "Scaleway DNS credentials created"
+
+if ! helm list -n cert-manager -q | grep -q '^scaleway-certmanager-webhook$'; then
+    info "Installing cert-manager-webhook-scaleway..."
+    helm repo add scaleway https://helm.scw.cloud/
+    helm repo update scaleway
+    helm install scaleway-certmanager-webhook scaleway/scaleway-certmanager-webhook \
+        --namespace cert-manager \
+        --set secret.externalSecretName=scaleway-dns-credentials \
+        --wait
+    ok "cert-manager-webhook-scaleway installed"
+else
+    info "Upgrading cert-manager-webhook-scaleway..."
+    helm upgrade scaleway-certmanager-webhook scaleway/scaleway-certmanager-webhook \
+        --namespace cert-manager \
+        --set secret.externalSecretName=scaleway-dns-credentials \
+        --wait
+    ok "cert-manager-webhook-scaleway upgraded"
 fi
 
 # --- Install External Secrets Operator (if not present) ---
@@ -249,11 +284,14 @@ if [[ -n "$LB_ADDRESS" ]]; then
     ok "Load Balancer address: $LB_ADDRESS"
     echo ""
     echo -e "${BLUE}DNS configuration:${NC}"
-    echo "  Create a CNAME record pointing your domain to the Load Balancer:"
+    echo "  CNAME for subdomain:"
     echo "    scw.sovereigncloudwisdom.eu → $LB_ADDRESS"
     echo ""
-    echo "  Once DNS propagates, cert-manager will automatically obtain a"
-    echo "  Let's Encrypt certificate. Check progress with:"
+    echo "  A record for apex domain (resolve LB hostname to IP first):"
+    echo "    sovereigncloudwisdom.eu → <LB IP>"
+    echo ""
+    echo "  Once DNS propagates, cert-manager will automatically obtain"
+    echo "  Let's Encrypt certificates. Check progress with:"
     echo "    kubectl get certificate -n sovereign-wisdom"
 else
     err "Timed out waiting for Load Balancer address (5 minutes)."

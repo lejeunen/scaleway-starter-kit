@@ -156,7 +156,7 @@ Internet → Load Balancer (TCP/443, proxy protocol v2) → NGINX Ingress Contro
 
 - **Provider communication:** All Scaleway API calls use TLS 1.2+
 - **Kubernetes API:** Accessible via HTTPS only (kubeconfig uses TLS)
-- **Ingress TLS:** TLS termination at the NGINX Ingress Controller using Let's Encrypt certificates managed by cert-manager. Certificates are automatically requested, validated (HTTP-01 challenge), and renewed. All HTTP traffic is redirected to HTTPS.
+- **Ingress TLS:** TLS termination at the NGINX Ingress Controller using Let's Encrypt certificates managed by cert-manager. Certificates are automatically requested, validated, and renewed. Subdomains use HTTP-01 challenges; the apex domain uses DNS-01 challenges via cert-manager-webhook-scaleway (Scaleway DNS API). All HTTP traffic is redirected to HTTPS.
   - *Code:* [`k8s/ingress/cluster-issuer.yaml`](k8s/ingress/cluster-issuer.yaml) — ClusterIssuer for Let's Encrypt
   - *Code:* [`k8s/app/ingress.yaml`](k8s/app/ingress.yaml) — TLS configuration and cert-manager annotation
 

@@ -1,11 +1,11 @@
 # Ingress resource — routes external traffic to the sovereign-wisdom app.
 #
-# Primary host: scw.sovereigncloudwisdom.eu (consistent with ovh.sovereigncloudwisdom.eu)
+# Two hosts:
+#   - scw.sovereigncloudwisdom.eu (subdomain, TLS via HTTP-01 challenge)
+#   - sovereigncloudwisdom.eu     (apex, TLS via DNS-01 challenge)
 #
-# The apex domain (sovereigncloudwisdom.eu) is not handled here because
-# cert-manager's HTTP-01 self-check fails from inside the cluster due to
-# Scaleway's proxy protocol + hairpin NAT. The apex can be added later
-# using a DNS-01 challenge solver, which avoids this issue entirely.
+# Each host has its own TLS secret because the certificates are obtained
+# through different ACME solvers (see cluster-issuer.yaml).
 
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -21,8 +21,21 @@ spec:
     - hosts:
         - scw.sovereigncloudwisdom.eu
       secretName: sovereign-wisdom-tls
+    - hosts:
+        - sovereigncloudwisdom.eu
+      secretName: sovereign-wisdom-apex-tls
   rules:
     - host: scw.sovereigncloudwisdom.eu
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sovereign-wisdom
+                port:
+                  number: 8000
+    - host: sovereigncloudwisdom.eu
       http:
         paths:
           - path: /

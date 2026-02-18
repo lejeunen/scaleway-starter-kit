@@ -5,14 +5,17 @@
 # and automatically:
 #   1. Generates a private key and CSR
 #   2. Creates an ACME order with Let's Encrypt
-#   3. Solves the HTTP-01 challenge (proves domain ownership by serving a
-#      token at http://<domain>/.well-known/acme-challenge/<token>)
+#   3. Solves the challenge (HTTP-01 or DNS-01 depending on domain)
 #   4. Stores the signed certificate in a Kubernetes Secret
 #   5. Renews it ~30 days before expiry
 #
-# The HTTP-01 solver uses the ingress controller: cert-manager creates a
-# temporary Ingress that routes the challenge path to a solver pod.
-# This is why the LB must be reachable on port 80 from the internet.
+# Two solvers are configured:
+#   - DNS-01 for the apex domain (sovereigncloudwisdom.eu): uses the
+#     cert-manager-webhook-scaleway to create a TXT record via Scaleway DNS API.
+#     This avoids the hairpin NAT + proxy protocol issue that breaks HTTP-01
+#     for the apex domain on Scaleway (see memory/scaleway-ingress.md).
+#   - HTTP-01 for subdomains (scw.sovereigncloudwisdom.eu): cert-manager creates
+#     a temporary Ingress that routes the challenge path to a solver pod.
 
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -27,6 +30,22 @@ spec:
     privateKeySecretRef:
       name: letsencrypt-prod-account-key
     solvers:
+      # DNS-01 for the apex domain (HTTP-01 fails due to hairpin NAT)
+      - selector:
+          dnsNames:
+            - sovereigncloudwisdom.eu
+        dns01:
+          webhook:
+            groupName: acme.scaleway.com
+            solverName: scaleway
+            config:
+              accessKeySecretRef:
+                key: SCW_ACCESS_KEY
+                name: scaleway-dns-credentials
+              secretKeySecretRef:
+                key: SCW_SECRET_KEY
+                name: scaleway-dns-credentials
+      # HTTP-01 for everything else (subdomains)
       - http01:
           ingress:
             ingressClassName: nginx

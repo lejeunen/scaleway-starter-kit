@@ -46,7 +46,7 @@ An infrastructure starter kit for [Scaleway](https://www.scaleway.com/), built w
 | **Kapsule** | Managed Kubernetes cluster with Cilium CNI, autoscaling (1–3 nodes), and autohealing. | Attached to private network, no public node exposure |
 | **PostgreSQL** | Managed database (PostgreSQL 16) with automated backups (daily, 7-day retention). | Private network only — no public endpoint. Password managed via Secret Manager. |
 | **NGINX Ingress Controller** | Kubernetes ingress controller exposed via a CCM-managed Scaleway Load Balancer. Routes traffic based on Ingress rules. | TLS termination via cert-manager (Let's Encrypt). The LB is the only externally reachable component. |
-| **cert-manager** | Automates Let's Encrypt certificate lifecycle: request, HTTP-01 challenge, storage as K8s Secret, and auto-renewal. | Certificates stored as Kubernetes Secrets, never on disk |
+| **cert-manager** | Automates Let's Encrypt certificate lifecycle: request, challenge validation, storage as K8s Secret, and auto-renewal. Uses HTTP-01 challenges for subdomains and DNS-01 (via cert-manager-webhook-scaleway) for the apex domain. | Certificates stored as Kubernetes Secrets, never on disk |
 | **Secret Manager** | Stores database credentials and API auth token. Synced to Kubernetes via External Secrets Operator. | Secrets never hardcoded, injected at runtime |
 | **Container Registry** | Private Docker image registry hosted on Scaleway. | Images stored in France, private access only |
 | **Cockpit** | Managed observability platform (Grafana, Mimir, Loki, Tempo). Kapsule metrics collected automatically. | Data stays in France, managed by Scaleway |
@@ -91,7 +91,7 @@ k8s/                               # Kubernetes manifests
 ├── namespace.yaml
 ├── ingress/                       # Ingress controller + TLS
 │   ├── nginx-values.yaml          # NGINX Ingress Helm values (Scaleway CCM annotations)
-│   └── cluster-issuer.yaml        # cert-manager Let's Encrypt ClusterIssuer
+│   └── cluster-issuer.yaml        # cert-manager ClusterIssuer (HTTP-01 + DNS-01 solvers)
 ├── external-secrets/              # External Secrets Operator config
 │   ├── external-secret.yaml       # DB password sync
 │   └── api-auth-token.yaml        # API auth token sync
@@ -190,23 +190,27 @@ The app Docker image must be built and pushed to the Container Registry first (s
 The script will:
 1. Install [NGINX Ingress Controller](https://kubernetes.github.io/ingress-nginx/) — creates a Scaleway Load Balancer via the CCM
 2. Install [cert-manager](https://cert-manager.io/) — automates Let's Encrypt TLS certificates
-3. Install [External Secrets Operator](https://external-secrets.io/) — syncs secrets from Scaleway Secret Manager
-4. Create Kubernetes secrets (registry pull credentials, Scaleway API access for ESO)
-5. Create a `ClusterSecretStore` pointing to Scaleway Secret Manager
-6. Sync the database password and API auth token as Kubernetes secrets via `ExternalSecret`
-7. Create the app `ConfigMap` with database connection details (fetched from Terragrunt outputs)
-8. Deploy the application (Deployment + ClusterIP Service + Ingress)
-9. Print the Load Balancer address for DNS configuration
+3. Install [cert-manager-webhook-scaleway](https://github.com/scaleway/cert-manager-webhook-scaleway) — DNS-01 solver for the apex domain via Scaleway DNS API
+4. Install [External Secrets Operator](https://external-secrets.io/) — syncs secrets from Scaleway Secret Manager
+5. Create Kubernetes secrets (registry pull credentials, Scaleway API access for ESO and DNS-01)
+6. Create a `ClusterSecretStore` pointing to Scaleway Secret Manager
+7. Sync the database password and API auth token as Kubernetes secrets via `ExternalSecret`
+8. Create the app `ConfigMap` with database connection details (fetched from Terragrunt outputs)
+9. Deploy the application (Deployment + ClusterIP Service + Ingress)
+10. Print the Load Balancer address for DNS configuration
 
 **Configure DNS:**
 
-After the script completes, it prints the Load Balancer hostname. Create a CNAME record:
+After the script completes, it prints the Load Balancer hostname. Create two DNS records:
 
 ```
-scw.sovereigncloudwisdom.eu → <LB hostname>
+scw.sovereigncloudwisdom.eu  CNAME → <LB hostname>
+sovereigncloudwisdom.eu      A     → <LB IP>
 ```
 
-Once DNS propagates, cert-manager automatically obtains a Let's Encrypt certificate. Check progress:
+> **Note:** Apex domains cannot use CNAME records (DNS specification). Resolve the LB hostname to get the IP: `dig +short <LB hostname>`.
+
+Once DNS propagates, cert-manager automatically obtains Let's Encrypt certificates — via HTTP-01 for the subdomain and DNS-01 for the apex domain. Check progress:
 
 ```bash
 kubectl get certificate -n sovereign-wisdom
@@ -216,6 +220,7 @@ kubectl get certificate -n sovereign-wisdom
 
 ```bash
 curl https://scw.sovereigncloudwisdom.eu/
+curl https://sovereigncloudwisdom.eu/
 ```
 
 **Retrieve the API auth token** (for use in client applications):
