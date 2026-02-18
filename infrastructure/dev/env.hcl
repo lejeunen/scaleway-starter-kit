@@ -37,11 +37,6 @@ locals {
   secret_name           = "dev-db-password"
   api_auth_token_secret = "dev-api-auth-token"
 
-  # Load Balancer
-  lb_name     = "dev-lb"
-  lb_type     = "LB-S"
-  domain_name = "sovereigncloudwisdom.eu"
-
   # Common tags
   tags = ["env:dev", "project:scaleway-starter-kit", "managed-by:terragrunt"]
 }

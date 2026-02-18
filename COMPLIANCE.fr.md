@@ -93,8 +93,8 @@ Cette infrastructure contribue à la conformité RGPD à travers :
   - *Code :* [`infrastructure/modules/vpc/main.tf`](infrastructure/modules/vpc/main.tf)
 - **Base de données privée :** PostgreSQL n'est accessible que depuis le réseau privé — aucun point d'accès public n'existe
   - *Code :* [`infrastructure/modules/database/main.tf`](infrastructure/modules/database/main.tf) — bloc `private_network`
-- **Point d'entrée unique :** seul le load balancer dispose d'une IP publique, servant de point d'accès unique
-  - *Code :* [`infrastructure/modules/load-balancer/main.tf`](infrastructure/modules/load-balancer/main.tf)
+- **Point d'entrée unique :** seul le Load Balancer géré par le CCM (provisionné par le NGINX Ingress Controller) dispose d'une IP publique, servant de point d'accès unique
+  - *Code :* [`k8s/ingress/nginx-values.yaml`](k8s/ingress/nginx-values.yaml)
 
 **Minimisation des données & Limitation des finalités**
 
@@ -119,7 +119,7 @@ Toutes les ressources d'infrastructure de ce projet sont déployées exclusiveme
 | VPC & Réseau Privé            | `fr-par` (Paris) | —          |
 | Cluster Kubernetes (Kapsule)  | `fr-par`         | `fr-par-1` |
 | Base de données PostgreSQL    | `fr-par`         | —          |
-| Load Balancer                 | —                | `fr-par-1` |
+| Load Balancer (géré par CCM)  | —                | `fr-par-1` |
 | Secret Manager                | `fr-par`         | —          |
 | Container Registry            | `fr-par`         | —          |
 | Cockpit (Observabilité)       | `fr-par`         | —          |
@@ -133,17 +133,16 @@ Aucune donnée ne quitte le territoire français. Les datacenters parisiens de S
 ### Sécurité réseau
 
 ```
-Internet → Load Balancer (HTTPS/443) → Réseau Privé (172.16.0.0/22) → Kapsule / PostgreSQL
+Internet → Load Balancer (TCP/443, proxy protocol v2) → NGINX Ingress Controller (terminaison TLS) → Réseau Privé (172.16.0.0/22) → Pods App / PostgreSQL
 ```
 
 - **Isolation VPC :** toutes les ressources internes communiquent via un réseau privé
 - **Aucune IP publique** sur les nœuds Kubernetes ou les instances de base de données
 - **Cilium CNI :** le cluster Kubernetes utilise Cilium, qui permet des politiques réseau granulaires pour le contrôle du trafic entre pods
   - *Code :* [`infrastructure/modules/kapsule/main.tf`](infrastructure/modules/kapsule/main.tf) — `cni = "cilium"`
-- **Health checks :** le load balancer effectue des vérifications HTTP pour s'assurer que seuls les backends sains reçoivent du trafic
-  - *Code :* [`infrastructure/modules/load-balancer/main.tf`](infrastructure/modules/load-balancer/main.tf)
-- **Gestion DNS :** les enregistrements DNS du domaine sont gérés en tant que code via Terraform, garantissant l'auditabilité
-  - *Code :* [`infrastructure/modules/load-balancer/main.tf`](infrastructure/modules/load-balancer/main.tf) — `scaleway_domain_record`
+- **Load Balancer géré par le CCM :** le Cloud Controller Manager de Scaleway provisionne et gère automatiquement le Load Balancer à partir du Service du NGINX Ingress Controller. Les backends sont mis à jour automatiquement lors des changements de nœuds (mises à jour, autoscaling).
+  - *Code :* [`k8s/ingress/nginx-values.yaml`](k8s/ingress/nginx-values.yaml)
+- **Health checks :** le NGINX Ingress Controller effectue des vérifications de santé sur les pods en amont pour s'assurer que seuls les backends sains reçoivent du trafic
 
 ### Chiffrement
 
@@ -157,8 +156,9 @@ Internet → Load Balancer (HTTPS/443) → Réseau Privé (172.16.0.0/22) → Ka
 
 - **Communication provider :** tous les appels API Scaleway utilisent TLS 1.2+
 - **API Kubernetes :** accessible uniquement via HTTPS (kubeconfig utilise TLS)
-- **Load balancer :** terminaison TLS avec certificats Let's Encrypt et renouvellement automatique. Tout le trafic HTTP est redirigé vers HTTPS (301). La gestion des certificats est assurée par le service load balancer de Scaleway.
-  - *Code :* [`infrastructure/modules/load-balancer/main.tf`](infrastructure/modules/load-balancer/main.tf) — `scaleway_lb_certificate` et frontend HTTPS
+- **TLS Ingress :** terminaison TLS au niveau du NGINX Ingress Controller avec des certificats Let's Encrypt gérés par cert-manager. Les certificats sont automatiquement demandés, validés (challenge HTTP-01) et renouvelés. Tout le trafic HTTP est redirigé vers HTTPS.
+  - *Code :* [`k8s/ingress/cluster-issuer.yaml`](k8s/ingress/cluster-issuer.yaml) — ClusterIssuer pour Let's Encrypt
+  - *Code :* [`k8s/app/ingress.yaml`](k8s/app/ingress.yaml) — configuration TLS et annotation cert-manager
 
 ### Gestion des secrets
 

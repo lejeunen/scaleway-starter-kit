@@ -1,0 +1,42 @@
+# Helm values for ingress-nginx on Scaleway Kapsule.
+#
+# The Scaleway CCM (Cloud Controller Manager) automatically provisions a
+# Scaleway Load Balancer from the ingress-nginx Service (type: LoadBalancer).
+# Annotations on the Service control the LB configuration.
+#
+# Traffic flow:
+#   Internet → Scaleway LB (TCP, proxy-protocol-v2)
+#            → NGINX Ingress Controller (decodes proxy protocol, terminates TLS)
+#            → ClusterIP Services → Pods
+#
+# Why proxy protocol?
+#   The LB operates at L4 (TCP) so it cannot insert HTTP headers like
+#   X-Forwarded-For. Instead, it prepends a PROXY protocol v2 header to each
+#   TCP connection. NGINX reads that header to recover the real client IP.
+#   Both sides must agree: LB sends it (annotation) and NGINX expects it (config).
+
+controller:
+  service:
+    annotations:
+      # Tell the CCM to create an LB-S (smallest, ~€8.50/mo)
+      service.beta.kubernetes.io/scw-loadbalancer-type: "LB-S"
+      # Place the LB in the same zone as the Kapsule cluster
+      service.beta.kubernetes.io/scw-loadbalancer-zone: "fr-par-1"
+      # Enable PROXY protocol v2 on all ports ("*")
+      service.beta.kubernetes.io/scw-loadbalancer-proxy-protocol-v2: "*"
+      # Populate Service status with hostname instead of IP.
+      # Required for cert-manager HTTP-01 challenges to work correctly:
+      # without this, in-cluster traffic bypasses the LB and the ACME
+      # challenge validation fails.
+      service.beta.kubernetes.io/scw-loadbalancer-use-hostname: "true"
+    # Preserve client source IP (works together with proxy protocol).
+    # Without this, kube-proxy SNAT would mask client IPs.
+    externalTrafficPolicy: Local
+
+  # NGINX must be configured to decode the PROXY protocol header sent by the LB.
+  # Without these settings, NGINX would see the raw PROXY protocol preamble
+  # and return 400 Bad Request.
+  config:
+    use-proxy-protocol: "true"
+    use-forwarded-headers: "true"
+    compute-full-forwarded-for: "true"

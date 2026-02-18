@@ -93,8 +93,8 @@ This infrastructure supports GDPR compliance through:
   - *Code:* [`infrastructure/modules/vpc/main.tf`](infrastructure/modules/vpc/main.tf)
 - **Private database:** PostgreSQL is accessible only from within the private network — no public endpoint exists
   - *Code:* [`infrastructure/modules/database/main.tf`](infrastructure/modules/database/main.tf) — `private_network` block
-- **Single entry point:** Only the load balancer has a public IP, acting as the sole ingress point
-  - *Code:* [`infrastructure/modules/load-balancer/main.tf`](infrastructure/modules/load-balancer/main.tf)
+- **Single entry point:** Only the CCM-managed Load Balancer (provisioned by the NGINX Ingress Controller) has a public IP, acting as the sole ingress point
+  - *Code:* [`k8s/ingress/nginx-values.yaml`](k8s/ingress/nginx-values.yaml)
 
 **Data Minimization & Purpose Limitation**
 
@@ -119,7 +119,7 @@ All infrastructure resources in this project are deployed exclusively in **Franc
 | VPC & Private Network         | `fr-par` (Paris)| —          |
 | Kubernetes Cluster (Kapsule)  | `fr-par`        | `fr-par-1` |
 | PostgreSQL Database           | `fr-par`        | —          |
-| Load Balancer                 | —               | `fr-par-1` |
+| Load Balancer (CCM-managed)   | —               | `fr-par-1` |
 | Secret Manager                | `fr-par`        | —          |
 | Container Registry            | `fr-par`        | —          |
 | Cockpit (Observability)       | `fr-par`        | —          |
@@ -133,17 +133,16 @@ No data leaves French territory. Scaleway's Paris datacenters (DC2-DC5) are loca
 ### Network Security
 
 ```
-Internet → Load Balancer (HTTPS/443) → Private Network (172.16.0.0/22) → Kapsule / PostgreSQL
+Internet → Load Balancer (TCP/443, proxy protocol v2) → NGINX Ingress Controller (TLS termination) → Private Network (172.16.0.0/22) → App Pods / PostgreSQL
 ```
 
 - **VPC isolation:** All internal resources communicate over a private network
 - **No public IPs** on Kubernetes nodes or database instances
 - **Cilium CNI:** The Kubernetes cluster uses Cilium, which supports fine-grained network policies for pod-to-pod traffic control
   - *Code:* [`infrastructure/modules/kapsule/main.tf`](infrastructure/modules/kapsule/main.tf) — `cni = "cilium"`
-- **Health checks:** Load balancer performs HTTP health checks to ensure only healthy backends receive traffic
-  - *Code:* [`infrastructure/modules/load-balancer/main.tf`](infrastructure/modules/load-balancer/main.tf)
-- **DNS management:** Domain DNS records managed as code via Terraform, ensuring auditability
-  - *Code:* [`infrastructure/modules/load-balancer/main.tf`](infrastructure/modules/load-balancer/main.tf) — `scaleway_domain_record`
+- **CCM-managed Load Balancer:** The Scaleway Cloud Controller Manager automatically provisions and manages the Load Balancer from the NGINX Ingress Controller Service. Backends are updated automatically when nodes change (upgrades, autoscaling).
+  - *Code:* [`k8s/ingress/nginx-values.yaml`](k8s/ingress/nginx-values.yaml)
+- **Health checks:** NGINX Ingress Controller performs health checks on upstream pods to ensure only healthy backends receive traffic
 
 ### Encryption
 
@@ -157,8 +156,9 @@ Internet → Load Balancer (HTTPS/443) → Private Network (172.16.0.0/22) → K
 
 - **Provider communication:** All Scaleway API calls use TLS 1.2+
 - **Kubernetes API:** Accessible via HTTPS only (kubeconfig uses TLS)
-- **Load balancer:** TLS termination using Let's Encrypt certificates with automatic renewal. All HTTP traffic is redirected to HTTPS (301). Certificate management is handled by Scaleway's load balancer service.
-  - *Code:* [`infrastructure/modules/load-balancer/main.tf`](infrastructure/modules/load-balancer/main.tf) — `scaleway_lb_certificate` and HTTPS frontend
+- **Ingress TLS:** TLS termination at the NGINX Ingress Controller using Let's Encrypt certificates managed by cert-manager. Certificates are automatically requested, validated (HTTP-01 challenge), and renewed. All HTTP traffic is redirected to HTTPS.
+  - *Code:* [`k8s/ingress/cluster-issuer.yaml`](k8s/ingress/cluster-issuer.yaml) — ClusterIssuer for Let's Encrypt
+  - *Code:* [`k8s/app/ingress.yaml`](k8s/app/ingress.yaml) — TLS configuration and cert-manager annotation
 
 ### Credentials Management
 

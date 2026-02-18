@@ -55,12 +55,67 @@ DB_ENDPOINT_PORT=$(cd "$INFRA_DEV_DIR/database" && terragrunt output -raw endpoi
 
 ok "Database endpoint: $DB_ENDPOINT_IP:$DB_ENDPOINT_PORT"
 
+# --- Install NGINX Ingress Controller (if not present) ---
+#
+# The ingress-nginx Helm chart creates a Service of type LoadBalancer.
+# The Scaleway CCM (pre-installed in Kapsule) detects it and automatically
+# provisions a Scaleway Load Balancer with the settings from the Service
+# annotations (see k8s/ingress/nginx-values.yaml).
+#
+# This replaces the old Terraform-managed LB, which had hardcoded backend IPs
+# that broke on node upgrades and cluster autoscaling.
+
+if ! kubectl get namespace ingress-nginx &>/dev/null; then
+    info "Installing NGINX Ingress Controller..."
+    helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+    helm repo update ingress-nginx
+    helm install ingress-nginx ingress-nginx/ingress-nginx \
+        --namespace ingress-nginx \
+        --create-namespace \
+        --values "$K8S_DIR/ingress/nginx-values.yaml" \
+        --wait
+    ok "NGINX Ingress Controller installed"
+else
+    info "Upgrading NGINX Ingress Controller..."
+    helm upgrade ingress-nginx ingress-nginx/ingress-nginx \
+        --namespace ingress-nginx \
+        --values "$K8S_DIR/ingress/nginx-values.yaml" \
+        --wait
+    ok "NGINX Ingress Controller upgraded"
+fi
+
+# --- Install cert-manager (if not present) ---
+#
+# cert-manager automates TLS certificate lifecycle:
+#   1. Watches for Ingress resources with cert-manager annotations
+#   2. Requests certificates from Let's Encrypt via ACME protocol
+#   3. Solves HTTP-01 challenges (proves domain ownership)
+#   4. Stores certs as Kubernetes Secrets
+#   5. Auto-renews ~30 days before expiry
+#
+# --set crds.enabled=true installs the CRDs (CustomResourceDefinitions)
+# that define cert-manager's API types (Certificate, ClusterIssuer, etc.)
+
+if ! kubectl get namespace cert-manager &>/dev/null; then
+    info "Installing cert-manager..."
+    helm repo add jetstack https://charts.jetstack.io
+    helm repo update jetstack
+    helm install cert-manager jetstack/cert-manager \
+        --namespace cert-manager \
+        --create-namespace \
+        --set crds.enabled=true \
+        --wait
+    ok "cert-manager installed"
+else
+    ok "cert-manager already installed"
+fi
+
 # --- Install External Secrets Operator (if not present) ---
 
 if ! kubectl get namespace external-secrets &>/dev/null; then
     info "Installing External Secrets Operator..."
     helm repo add external-secrets https://charts.external-secrets.io
-    helm repo update
+    helm repo update external-secrets
     helm install external-secrets external-secrets/external-secrets \
         --namespace external-secrets \
         --create-namespace \
@@ -146,31 +201,63 @@ kubectl create configmap app-config \
     --dry-run=client -o yaml | kubectl apply -f -
 ok "ConfigMap created"
 
-# --- Apply Deployment and Service ---
+# --- Apply Deployment, Service, and Ingress ---
 
 info "Applying app Deployment..."
 kubectl apply -f "$K8S_DIR/app/deployment.yaml"
 
 info "Applying app Service..."
 kubectl apply -f "$K8S_DIR/app/service.yaml"
+
+# --- Apply ClusterIssuer and Ingress ---
+#
+# ClusterIssuer must exist before the Ingress, because cert-manager reads
+# the Ingress annotation and looks up the referenced ClusterIssuer to know
+# which ACME server to use.
+
+info "Applying ClusterIssuer..."
+kubectl apply -f "$K8S_DIR/ingress/cluster-issuer.yaml"
+
+info "Applying app Ingress..."
+kubectl apply -f "$K8S_DIR/app/ingress.yaml"
+
 ok "App deployed"
 
-# --- Update LB backend with node IPs ---
+# --- Wait for Load Balancer IP ---
 
-info "Fetching Kapsule node IPs..."
-NODE_IPS=$(kubectl get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}')
+echo ""
+info "Waiting for the Load Balancer external address..."
 
-if [[ -n "$NODE_IPS" ]]; then
-    ok "Node IPs: $NODE_IPS"
+LB_ADDRESS=""
+for i in $(seq 1 30); do
+    LB_ADDRESS=$(kubectl get svc ingress-nginx-controller \
+        -n ingress-nginx \
+        -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+    if [[ -z "$LB_ADDRESS" ]]; then
+        LB_ADDRESS=$(kubectl get svc ingress-nginx-controller \
+            -n ingress-nginx \
+            -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+    fi
+    if [[ -n "$LB_ADDRESS" ]]; then
+        break
+    fi
+    sleep 10
+done
+
+echo ""
+if [[ -n "$LB_ADDRESS" ]]; then
+    ok "Load Balancer address: $LB_ADDRESS"
     echo ""
-    echo -e "${BLUE}To update the load balancer backend, add these IPs to:${NC}"
-    echo "  infrastructure/dev/load-balancer/terragrunt.hcl"
+    echo -e "${BLUE}DNS configuration:${NC}"
+    echo "  Create a CNAME record pointing your domain to the Load Balancer:"
+    echo "    scw.sovereigncloudwisdom.eu → $LB_ADDRESS"
     echo ""
-    echo "  backend_server_ips = [$(echo "$NODE_IPS" | tr ' ' '\n' | sed 's/.*/"&"/' | paste -sd, -)]"
-    echo ""
-    echo "Then run: cd ../infrastructure/dev/load-balancer && terragrunt apply"
+    echo "  Once DNS propagates, cert-manager will automatically obtain a"
+    echo "  Let's Encrypt certificate. Check progress with:"
+    echo "    kubectl get certificate -n sovereign-wisdom"
 else
-    err "Could not retrieve node IPs"
+    err "Timed out waiting for Load Balancer address (5 minutes)."
+    echo "  Check status with: kubectl get svc -n ingress-nginx"
 fi
 
 echo ""

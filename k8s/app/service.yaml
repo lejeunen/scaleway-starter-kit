@@ -6,10 +6,9 @@ metadata:
   labels:
     app: sovereign-wisdom
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: sovereign-wisdom
   ports:
     - port: 8000
       targetPort: 8000
-      nodePort: 30080

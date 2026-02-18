@@ -8,17 +8,20 @@ An infrastructure starter kit for [Scaleway](https://www.scaleway.com/), built w
                 Internet
                    │
               ┌────┴────┐
-              │  Load   │  ← HTTPS (Let's Encrypt) — only public-facing resource
-              │Balancer │
+              │  Load   │  ← Provisioned by the Scaleway Cloud Controller Manager (CCM)
+              │Balancer │     via the NGINX Ingress Controller Service
               └────┬────┘
-                   │
+                   │ TCP (proxy protocol v2)
      ┌─────────────┼─────────────┐
      │    VPC / Private Network  │
      │             │             │
      │   ┌─────────┴─────────┐   │
      │   │     Kapsule       │   │
      │   │   (Kubernetes)    │   │
-     │   │  ┌─────────────┐  │   │
+     │   │                   │   │
+     │   │  NGINX Ingress ←──── TLS termination (Let's Encrypt via cert-manager)
+     │   │       │           │   │
+     │   │  ┌────┴────────┐  │   │
      │   │  │ Sovereign   │  │   │
      │   │  │ Cloud Wisdom│  │   │
      │   │  └──────┬──────┘  │   │
@@ -42,16 +45,19 @@ An infrastructure starter kit for [Scaleway](https://www.scaleway.com/), built w
 | **VPC + Private Network** | Isolated network with a `172.16.0.0/22` subnet. All resources communicate over private IPs only. | Network isolation for all internal resources |
 | **Kapsule** | Managed Kubernetes cluster with Cilium CNI, autoscaling (1–3 nodes), and autohealing. | Attached to private network, no public node exposure |
 | **PostgreSQL** | Managed database (PostgreSQL 16) with automated backups (daily, 7-day retention). | Private network only — no public endpoint. Password managed via Secret Manager. |
-| **Load Balancer** | Public load balancer with HTTPS (Let's Encrypt), HTTP→HTTPS redirect, and health checks. Connected to the private network. | TLS termination at the LB. The only externally reachable component. |
+| **NGINX Ingress Controller** | Kubernetes ingress controller exposed via a CCM-managed Scaleway Load Balancer. Routes traffic based on Ingress rules. | TLS termination via cert-manager (Let's Encrypt). The LB is the only externally reachable component. |
+| **cert-manager** | Automates Let's Encrypt certificate lifecycle: request, HTTP-01 challenge, storage as K8s Secret, and auto-renewal. | Certificates stored as Kubernetes Secrets, never on disk |
 | **Secret Manager** | Stores database credentials and API auth token. Synced to Kubernetes via External Secrets Operator. | Secrets never hardcoded, injected at runtime |
 | **Container Registry** | Private Docker image registry hosted on Scaleway. | Images stored in France, private access only |
 | **Cockpit** | Managed observability platform (Grafana, Mimir, Loki, Tempo). Kapsule metrics collected automatically. | Data stays in France, managed by Scaleway |
+
+> **Why not a Terraform-managed Load Balancer?** This project initially used a Scaleway Load Balancer managed entirely by Terraform — a natural choice when your infrastructure-as-code tool is Terraform and you want everything in one dependency graph. It worked, but the backend configuration required hardcoding node IPs. This broke whenever Kapsule auto-upgraded nodes (the IPs changed) or the cluster autoscaler added a node (the new node wasn't in the backend list). By letting the Kubernetes Cloud Controller Manager (CCM) manage the Load Balancer instead, backends are updated automatically — node upgrades and autoscaling just work.
 
 ### Dependency Graph
 
 ```
 vpc
- ├── kapsule → load-balancer
+ ├── kapsule
  └── database
 
 secret-manager   (independent)
@@ -68,7 +74,6 @@ infrastructure/
 │   ├── vpc/                       # VPC + private network
 │   ├── kapsule/                   # Kubernetes cluster + node pool
 │   ├── database/                  # PostgreSQL managed database
-│   ├── load-balancer/             # Public load balancer
 │   ├── secret-manager/            # Scaleway Secret Manager
 │   ├── registry/                  # Scaleway Container Registry
 │   └── cockpit/                   # Scaleway Cockpit (observability)
@@ -77,7 +82,6 @@ infrastructure/
     ├── vpc/terragrunt.hcl
     ├── kapsule/terragrunt.hcl
     ├── database/terragrunt.hcl
-    ├── load-balancer/terragrunt.hcl
     ├── secret-manager-db-password/terragrunt.hcl
     ├── secret-manager-api-token/terragrunt.hcl
     ├── registry/terragrunt.hcl
@@ -85,12 +89,16 @@ infrastructure/
 
 k8s/                               # Kubernetes manifests
 ├── namespace.yaml
+├── ingress/                       # Ingress controller + TLS
+│   ├── nginx-values.yaml          # NGINX Ingress Helm values (Scaleway CCM annotations)
+│   └── cluster-issuer.yaml        # cert-manager Let's Encrypt ClusterIssuer
 ├── external-secrets/              # External Secrets Operator config
 │   ├── external-secret.yaml       # DB password sync
 │   └── api-auth-token.yaml        # API auth token sync
 └── app/                           # Application deployment
     ├── deployment.yaml
-    └── service.yaml
+    ├── service.yaml
+    └── ingress.yaml               # App routing rules + TLS
 
 scripts/
 ├── validate.sh                    # Validation & security scanning
@@ -105,7 +113,7 @@ The root Terragrunt config (`root.hcl`) is environment-agnostic — all environm
 - [OpenTofu](https://opentofu.org/) >= 1.6.0
 - [Terragrunt](https://terragrunt.gruntwork.io/) >= 0.93.0
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
-- [Helm](https://helm.sh/) (for External Secrets Operator)
+- [Helm](https://helm.sh/) (for ingress-nginx, cert-manager, External Secrets Operator)
 - [jq](https://jqlang.github.io/jq/)
 - A Scaleway account with API credentials
 
@@ -142,28 +150,16 @@ Then load it:
 source .env
 ```
 
-### 3. (Optional) Custom domain with HTTPS
-
-If you want HTTPS with a custom domain, register it in the [Scaleway Domains](https://console.scaleway.com/domains/) console and set `domain_name` in `infrastructure/dev/env.hcl`:
-
-```hcl
-domain_name = "yourdomain.eu"
-```
-
-The load balancer will automatically create a DNS A record, obtain a Let's Encrypt certificate, and redirect HTTP to HTTPS. If you skip this step, the load balancer works on plain HTTP.
-
-> **Note:** On the first apply, the certificate creation may fail if DNS hasn't propagated yet. Simply re-run `terragrunt apply` in the load-balancer directory after a minute.
-
-### 4. Deploy the infrastructure
+### 3. Deploy the infrastructure
 
 ```bash
 cd infrastructure/dev
 terragrunt run --all apply
 ```
 
-Terragrunt will deploy in order: VPC → Kapsule + Database (parallel) → Load Balancer. Secret Manager and Container Registry are independent and deploy in parallel with the rest.
+Terragrunt will deploy in order: VPC → Kapsule + Database (parallel). Secret Manager, Container Registry, and Cockpit are independent and deploy in parallel with the rest.
 
-### 5. Generate the kubeconfig
+### 4. Generate the kubeconfig
 
 After the Kapsule cluster is deployed:
 
@@ -179,7 +175,7 @@ Then connect to the cluster:
 kubectl get nodes
 ```
 
-### 6. Deploy the application
+### 5. Deploy the application
 
 The starter kit includes Kubernetes manifests for [**Sovereign Cloud Wisdom**](https://github.com/lejeunen/sovereign-cloud-wisdom), a demo application that serves curated wisdom about European digital sovereignty.
 
@@ -192,13 +188,35 @@ The app Docker image must be built and pushed to the Container Registry first (s
 ```
 
 The script will:
-1. Install [External Secrets Operator](https://external-secrets.io/) (if not already present)
-2. Create Kubernetes secrets (registry pull credentials, Scaleway API access for ESO)
-3. Create a `ClusterSecretStore` pointing to Scaleway Secret Manager
-4. Sync the database password and API auth token as Kubernetes secrets via `ExternalSecret`
-5. Create the app `ConfigMap` with database connection details (fetched from Terragrunt outputs)
-6. Deploy the application (Deployment + NodePort Service on port 30080)
-7. Print the Kapsule node IPs for load balancer configuration
+1. Install [NGINX Ingress Controller](https://kubernetes.github.io/ingress-nginx/) — creates a Scaleway Load Balancer via the CCM
+2. Install [cert-manager](https://cert-manager.io/) — automates Let's Encrypt TLS certificates
+3. Install [External Secrets Operator](https://external-secrets.io/) — syncs secrets from Scaleway Secret Manager
+4. Create Kubernetes secrets (registry pull credentials, Scaleway API access for ESO)
+5. Create a `ClusterSecretStore` pointing to Scaleway Secret Manager
+6. Sync the database password and API auth token as Kubernetes secrets via `ExternalSecret`
+7. Create the app `ConfigMap` with database connection details (fetched from Terragrunt outputs)
+8. Deploy the application (Deployment + ClusterIP Service + Ingress)
+9. Print the Load Balancer address for DNS configuration
+
+**Configure DNS:**
+
+After the script completes, it prints the Load Balancer hostname. Create a CNAME record:
+
+```
+scw.sovereigncloudwisdom.eu → <LB hostname>
+```
+
+Once DNS propagates, cert-manager automatically obtains a Let's Encrypt certificate. Check progress:
+
+```bash
+kubectl get certificate -n sovereign-wisdom
+```
+
+**Verify:**
+
+```bash
+curl https://scw.sovereigncloudwisdom.eu/
+```
 
 **Retrieve the API auth token** (for use in client applications):
 
@@ -212,33 +230,7 @@ To rotate the token manually:
 ./scripts/rotate-api-token.sh
 ```
 
-**Wire the load balancer:**
-
-The script prints the node IPs at the end. Update `infrastructure/dev/load-balancer/terragrunt.hcl`:
-
-```hcl
-backend_server_ips = ["172.16.x.x"]
-```
-
-Then apply:
-
-```bash
-cd infrastructure/dev/load-balancer
-terragrunt apply
-```
-
-**Verify:**
-
-```bash
-# Using the custom domain
-curl https://sovereigncloudwisdom.eu/
-
-# Or via IP (HTTP, will redirect to HTTPS if domain is configured)
-LB_IP=$(cd infrastructure/dev/load-balancer && terragrunt output -raw lb_ip)
-curl -L http://$LB_IP/
-```
-
-### 7. Access the Grafana dashboard
+### 6. Access the Grafana dashboard
 
 Cockpit is Scaleway's managed observability platform. Kapsule metrics are collected automatically at no cost, and is very easy to set up.
 
@@ -266,7 +258,7 @@ Open the Grafana URL and log in with your Scaleway IAM credentials. Pre-configur
 
 3. Copy the child module configs (they're identical — all values come from `env.hcl`):
    ```bash
-   for module in vpc kapsule database load-balancer secret-manager-db-password secret-manager-api-token registry cockpit; do
+   for module in vpc kapsule database secret-manager-db-password secret-manager-api-token registry cockpit; do
      mkdir -p "infrastructure/staging/$module"
      cp "infrastructure/dev/$module/terragrunt.hcl" "infrastructure/staging/$module/"
    done
@@ -327,7 +319,6 @@ This starter kit is a foundation, not a turnkey production setup. You would stil
 
 - **GitOps** workflow (ArgoCD, Flux)
 - **CI/CD** pipeline for infrastructure and application
-- **Ingress controller** for path-based routing
 - **Network policies** for fine-grained pod-to-pod traffic control
 - **Secure private network access** (VPN or bastion) for reaching internal resources like the database
 - **Backup strategy** beyond the managed database backups
