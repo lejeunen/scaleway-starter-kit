@@ -69,7 +69,7 @@ The European Union and its member states are actively promoting digital sovereig
 
 ### SecNumCloud
 
-[SecNumCloud](https://www.anssi.gouv.fr/enjeux-technologiques/cloud/) is a security certification issued by **ANSSI** (Agence Nationale de la Sécurité des Systèmes d'Information), the French national cybersecurity agency. It is the highest level of cloud security certification in France.
+[SecNumCloud](https://cyber.gouv.fr/enjeux-technologiques/cloud/) is a security certification issued by **ANSSI** (Agence Nationale de la Sécurité des Systèmes d'Information), the French national cybersecurity agency. It is the highest level of cloud security certification in France.
 
 Scaleway is currently pursuing SecNumCloud 3.2 qualification for its cloud services. This certification demonstrates compliance with rigorous security requirements including:
 - Physical security of datacenters
