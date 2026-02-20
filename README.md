@@ -332,9 +332,30 @@ This starter kit is a foundation, not a turnkey production setup. You would stil
 
 ## Tear Down
 
+**Important:** Follow this order to avoid orphaned resources.
+
+**1. Delete Kubernetes resources first**
+
+The NGINX Ingress Controller creates a Scaleway Load Balancer via the CCM. If you destroy the cluster without removing it first, the LB becomes orphaned in your Scaleway account.
+
+```bash
+helm uninstall ingress-nginx -n ingress-nginx
+```
+
+Wait for the Load Balancer to disappear in the [Scaleway console](https://console.scaleway.com/) before proceeding.
+
+**2. Destroy the infrastructure**
+
 ```bash
 cd infrastructure/dev
 terragrunt run --all destroy
 ```
 
-> **Note:** Scaleway secrets might survive `destroy`. Delete them manually (`scw secret secret delete <id>`) before redeploying, or you'll get a "cannot have same secret name" error.
+**3. Clean up Scaleway secrets**
+
+Scaleway secrets survive `terragrunt destroy`. Delete them manually before redeploying, or you'll get a "cannot have same secret name" error:
+
+```bash
+scw secret secret list
+scw secret secret delete <secret-id>
+```
