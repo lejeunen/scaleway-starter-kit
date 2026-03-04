@@ -1,0 +1,23 @@
+# HTTPRoute — redirects all HTTP traffic to HTTPS (301 permanent redirect).
+#
+# Attached to the Gateway's "http" listener (port 80). Any request hitting
+# port 80 gets a 301 redirect to the same URL with scheme "https".
+# This replaces the nginx.ingress.kubernetes.io/ssl-redirect annotation.
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: https-redirect
+  namespace: envoy-gateway-system
+spec:
+  parentRefs:
+    - name: eg
+      sectionName: http
+  hostnames:
+    - sovereigncloudwisdom.eu
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301

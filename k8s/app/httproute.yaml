@@ -1,0 +1,20 @@
+# HTTPRoute — routes external traffic to the sovereign-wisdom app.
+#
+# Attached to the Gateway's HTTPS listener for sovereigncloudwisdom.eu.
+# All requests to the apex domain are forwarded to the app Service.
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: sovereign-wisdom
+  namespace: sovereign-wisdom
+spec:
+  parentRefs:
+    - name: eg
+      namespace: envoy-gateway-system
+  hostnames:
+    - sovereigncloudwisdom.eu
+  rules:
+    - backendRefs:
+        - name: sovereign-wisdom
+          port: 8000

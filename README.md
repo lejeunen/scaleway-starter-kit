@@ -9,7 +9,7 @@ An infrastructure starter kit for [Scaleway](https://www.scaleway.com/), built w
                    │
               ┌────┴────┐
               │  Load   │  ← Provisioned by the Scaleway Cloud Controller Manager (CCM)
-              │Balancer │     via the NGINX Ingress Controller Service
+              │Balancer │     via the Envoy Gateway Service
               └────┬────┘
                    │ TCP (proxy protocol v2)
      ┌─────────────┼─────────────┐
@@ -19,7 +19,7 @@ An infrastructure starter kit for [Scaleway](https://www.scaleway.com/), built w
      │   │     Kapsule       │   │
      │   │   (Kubernetes)    │   │
      │   │                   │   │
-     │   │  NGINX Ingress ←──── TLS termination (Let's Encrypt via cert-manager)
+     │   │  Envoy Gateway ←───── TLS termination (Let's Encrypt via cert-manager)
      │   │       │           │   │
      │   │  ┌────┴────────┐  │   │
      │   │  │ Sovereign   │  │   │
@@ -45,8 +45,8 @@ An infrastructure starter kit for [Scaleway](https://www.scaleway.com/), built w
 | **VPC + Private Network** | Isolated network with a `172.16.0.0/22` subnet. All resources communicate over private IPs only. | Network isolation for all internal resources |
 | **Kapsule** | Managed Kubernetes cluster with Cilium CNI, autoscaling (1–3 nodes), and autohealing. | Attached to private network, no public node exposure |
 | **PostgreSQL** | Managed database (PostgreSQL 16) with automated backups (daily, 7-day retention). | Private network only — no public endpoint. Password managed via Secret Manager. |
-| **NGINX Ingress Controller** | Kubernetes ingress controller exposed via a CCM-managed Scaleway Load Balancer. Routes traffic based on Ingress rules. | TLS termination via cert-manager (Let's Encrypt). The LB is the only externally reachable component. |
-| **cert-manager** | Automates Let's Encrypt certificate lifecycle: request, challenge validation, storage as K8s Secret, and auto-renewal. Uses HTTP-01 challenges for subdomains and DNS-01 (via cert-manager-webhook-scaleway) for the apex domain. | Certificates stored as Kubernetes Secrets, never on disk |
+| **Envoy Gateway** | Kubernetes Gateway API implementation using Envoy proxy. Routes traffic based on HTTPRoute rules. Exposed via a CCM-managed Scaleway Load Balancer. | TLS termination via cert-manager (Let's Encrypt). The LB is the only externally reachable component. |
+| **cert-manager** | Automates Let's Encrypt certificate lifecycle: request, DNS-01 challenge validation (via cert-manager-webhook-scaleway), storage as K8s Secret, and auto-renewal. | Certificates stored as Kubernetes Secrets, never on disk |
 | **Secret Manager** | Stores database credentials and API auth token. Synced to Kubernetes via External Secrets Operator. | Secrets never hardcoded, injected at runtime |
 | **Container Registry** | Private Docker image registry hosted on Scaleway. | Images stored in France, private access only |
 | **Cockpit** | Managed observability platform (Grafana, Mimir, Loki, Tempo). Kapsule metrics collected automatically. | Data stays in France, managed by Scaleway |
@@ -89,16 +89,20 @@ infrastructure/
 
 k8s/                               # Kubernetes manifests
 ├── namespace.yaml
-├── ingress/                       # Ingress controller + TLS
-│   ├── nginx-values.yaml          # NGINX Ingress Helm values (Scaleway CCM annotations)
-│   └── cluster-issuer.yaml        # cert-manager ClusterIssuer (HTTP-01 + DNS-01 solvers)
+├── gateway/                       # Envoy Gateway + TLS
+│   ├── gatewayclass.yaml          # GatewayClass (Envoy Gateway controller)
+│   ├── envoyproxy.yaml            # EnvoyProxy (Scaleway LB annotations)
+│   ├── clienttrafficpolicy.yaml   # PROXY protocol parsing
+│   ├── gateway.yaml               # Gateway (HTTP/HTTPS listeners)
+│   ├── httproute-redirect.yaml    # HTTP → HTTPS redirect (301)
+│   └── cluster-issuer.yaml        # cert-manager ClusterIssuer (DNS-01 solver)
 ├── external-secrets/              # External Secrets Operator config
 │   ├── external-secret.yaml       # DB password sync
 │   └── api-auth-token.yaml        # API auth token sync
 └── app/                           # Application deployment
     ├── deployment.yaml
     ├── service.yaml
-    └── ingress.yaml               # App routing rules + TLS
+    └── httproute.yaml             # App routing rules (Gateway API)
 
 scripts/
 ├── validate.sh                    # Validation & security scanning
@@ -113,7 +117,7 @@ The root Terragrunt config (`root.hcl`) is environment-agnostic — all environm
 - [OpenTofu](https://opentofu.org/) >= 1.6.0
 - [Terragrunt](https://terragrunt.gruntwork.io/) >= 0.93.0
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
-- [Helm](https://helm.sh/) (for ingress-nginx, cert-manager, External Secrets Operator)
+- [Helm](https://helm.sh/) (for Envoy Gateway, cert-manager, External Secrets Operator)
 - [jq](https://jqlang.github.io/jq/)
 - A Scaleway account with API credentials
 
@@ -188,38 +192,37 @@ The app Docker image must be built and pushed to the Container Registry first (s
 ```
 
 The script will:
-1. Install [NGINX Ingress Controller](https://kubernetes.github.io/ingress-nginx/) — creates a Scaleway Load Balancer via the CCM
-2. Install [cert-manager](https://cert-manager.io/) — automates Let's Encrypt TLS certificates
-3. Install [cert-manager-webhook-scaleway](https://github.com/scaleway/cert-manager-webhook-scaleway) — DNS-01 solver for the apex domain via Scaleway DNS API
-4. Install [External Secrets Operator](https://external-secrets.io/) — syncs secrets from Scaleway Secret Manager
-5. Create Kubernetes secrets (registry pull credentials, Scaleway API access for ESO and DNS-01)
-6. Create a `ClusterSecretStore` pointing to Scaleway Secret Manager
-7. Sync the database password and API auth token as Kubernetes secrets via `ExternalSecret`
-8. Create the app `ConfigMap` with database connection details (fetched from Terragrunt outputs)
-9. Deploy the application (Deployment + ClusterIP Service + Ingress)
-10. Print the Load Balancer address for DNS configuration
+1. Install [Envoy Gateway](https://gateway.envoyproxy.io/) — Kubernetes Gateway API implementation using Envoy proxy
+2. Apply Gateway API resources — GatewayClass, EnvoyProxy, Gateway, HTTPRoutes (creates a Scaleway Load Balancer via the CCM)
+3. Install [cert-manager](https://cert-manager.io/) — automates Let's Encrypt TLS certificates (with Gateway API support)
+4. Install [cert-manager-webhook-scaleway](https://github.com/scaleway/cert-manager-webhook-scaleway) — DNS-01 solver via Scaleway DNS API
+5. Install [External Secrets Operator](https://external-secrets.io/) — syncs secrets from Scaleway Secret Manager
+6. Create Kubernetes secrets (registry pull credentials, Scaleway API access for ESO and DNS-01)
+7. Create a `ClusterSecretStore` pointing to Scaleway Secret Manager
+8. Sync the database password and API auth token as Kubernetes secrets via `ExternalSecret`
+9. Create the app `ConfigMap` with database connection details (fetched from Terragrunt outputs)
+10. Deploy the application (Deployment + ClusterIP Service + HTTPRoute)
+11. Print the Load Balancer address for DNS configuration
 
 **Configure DNS:**
 
-After the script completes, it prints the Load Balancer hostname. Create two DNS records:
+After the script completes, it prints the Load Balancer hostname. Create a DNS record:
 
 ```
-scw.sovereigncloudwisdom.eu  CNAME → <LB hostname>
-sovereigncloudwisdom.eu      A     → <LB IP>
+sovereigncloudwisdom.eu  A → <LB IP>
 ```
 
 > **Note:** Apex domains cannot use CNAME records (DNS specification). Resolve the LB hostname to get the IP: `dig +short <LB hostname>`.
 
-Once DNS propagates, cert-manager automatically obtains Let's Encrypt certificates — via HTTP-01 for the subdomain and DNS-01 for the apex domain. Check progress:
+Once DNS propagates, cert-manager automatically obtains a Let's Encrypt certificate via DNS-01. Check progress:
 
 ```bash
-kubectl get certificate -n sovereign-wisdom
+kubectl get certificate -n envoy-gateway-system
 ```
 
 **Verify:**
 
 ```bash
-curl https://scw.sovereigncloudwisdom.eu/
 curl https://sovereigncloudwisdom.eu/
 ```
 
@@ -336,10 +339,10 @@ This starter kit is a foundation, not a turnkey production setup. You would stil
 
 **1. Delete Kubernetes resources first**
 
-The NGINX Ingress Controller creates a Scaleway Load Balancer via the CCM. If you destroy the cluster without removing it first, the LB becomes orphaned in your Scaleway account.
+Envoy Gateway creates a Scaleway Load Balancer via the CCM. If you destroy the cluster without removing it first, the LB becomes orphaned in your Scaleway account.
 
 ```bash
-helm uninstall ingress-nginx -n ingress-nginx
+helm uninstall eg -n envoy-gateway-system
 ```
 
 Wait for the Load Balancer to disappear in the [Scaleway console](https://console.scaleway.com/) before proceeding.

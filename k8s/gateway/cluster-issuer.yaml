@@ -1,0 +1,36 @@
+# ClusterIssuer for automated TLS certificates via Let's Encrypt.
+#
+# cert-manager watches Gateway resources annotated with
+#   cert-manager.io/cluster-issuer: letsencrypt-prod
+# and automatically:
+#   1. Generates a private key and CSR
+#   2. Creates an ACME order with Let's Encrypt
+#   3. Solves the DNS-01 challenge (proves domain ownership via TXT record)
+#   4. Stores the signed certificate in a Kubernetes Secret
+#   5. Renews it ~30 days before expiry
+#
+# DNS-01 is used for all domains. The cert-manager-webhook-scaleway creates
+# and deletes TXT records (_acme-challenge.<domain>) via the Scaleway DNS API.
+
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: nicolas@sovereigncloudwisdom.eu
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - dns01:
+          webhook:
+            groupName: acme.scaleway.com
+            solverName: scaleway
+            config:
+              accessKeySecretRef:
+                key: SCW_ACCESS_KEY
+                name: scaleway-dns-credentials
+              secretKeySecretRef:
+                key: SCW_SECRET_KEY
+                name: scaleway-dns-credentials

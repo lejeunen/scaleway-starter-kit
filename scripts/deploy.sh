@@ -55,46 +55,60 @@ DB_ENDPOINT_PORT=$(cd "$INFRA_DEV_DIR/database" && terragrunt output -raw endpoi
 
 ok "Database endpoint: $DB_ENDPOINT_IP:$DB_ENDPOINT_PORT"
 
-# --- Install NGINX Ingress Controller (if not present) ---
+# --- Install Envoy Gateway (if not present) ---
 #
-# The ingress-nginx Helm chart creates a Service of type LoadBalancer.
-# The Scaleway CCM (pre-installed in Kapsule) detects it and automatically
-# provisions a Scaleway Load Balancer with the settings from the Service
-# annotations (see k8s/ingress/nginx-values.yaml).
+# Envoy Gateway implements the Kubernetes Gateway API. It watches for Gateway
+# and HTTPRoute resources and provisions Envoy proxy instances to handle traffic.
 #
-# This replaces the old Terraform-managed LB, which had hardcoded backend IPs
-# that broke on node upgrades and cluster autoscaling.
+# The Helm chart installs the control plane. The data plane (Envoy proxies) is
+# created automatically when a Gateway resource is applied. The Scaleway CCM
+# detects the resulting LoadBalancer Service and provisions a managed LB.
 
-if ! kubectl get namespace ingress-nginx &>/dev/null; then
-    info "Installing NGINX Ingress Controller..."
-    helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-    helm repo update ingress-nginx
-    helm install ingress-nginx ingress-nginx/ingress-nginx \
-        --namespace ingress-nginx \
+if ! kubectl get namespace envoy-gateway-system &>/dev/null; then
+    info "Installing Envoy Gateway..."
+    helm install eg oci://docker.io/envoyproxy/gateway-helm \
+        --version v1.3.0 \
+        --namespace envoy-gateway-system \
         --create-namespace \
-        --values "$K8S_DIR/ingress/nginx-values.yaml" \
         --wait
-    ok "NGINX Ingress Controller installed"
+    ok "Envoy Gateway installed"
 else
-    info "Upgrading NGINX Ingress Controller..."
-    helm upgrade ingress-nginx ingress-nginx/ingress-nginx \
-        --namespace ingress-nginx \
-        --values "$K8S_DIR/ingress/nginx-values.yaml" \
+    info "Upgrading Envoy Gateway..."
+    helm upgrade eg oci://docker.io/envoyproxy/gateway-helm \
+        --version v1.3.0 \
+        --namespace envoy-gateway-system \
         --wait
-    ok "NGINX Ingress Controller upgraded"
+    ok "Envoy Gateway upgraded"
 fi
+
+# --- Apply Gateway API resources ---
+#
+# These resources configure the data plane:
+#   - GatewayClass: links to the Envoy Gateway controller
+#   - EnvoyProxy: Scaleway LB annotations (type, zone, proxy protocol)
+#   - ClientTrafficPolicy: tells Envoy to parse PROXY protocol headers
+#   - Gateway: defines HTTP/HTTPS listeners with TLS termination
+#   - HTTPRoute (redirect): redirects HTTP → HTTPS (301)
+
+info "Applying Gateway API resources..."
+kubectl apply -f "$K8S_DIR/gateway/envoyproxy.yaml"
+kubectl apply -f "$K8S_DIR/gateway/gatewayclass.yaml"
+kubectl apply -f "$K8S_DIR/gateway/clienttrafficpolicy.yaml"
+kubectl apply -f "$K8S_DIR/gateway/gateway.yaml"
+kubectl apply -f "$K8S_DIR/gateway/httproute-redirect.yaml"
+ok "Gateway API resources applied"
 
 # --- Install cert-manager (if not present) ---
 #
 # cert-manager automates TLS certificate lifecycle:
-#   1. Watches for Ingress resources with cert-manager annotations
+#   1. Watches for Gateway resources with cert-manager annotations
 #   2. Requests certificates from Let's Encrypt via ACME protocol
-#   3. Solves HTTP-01 or DNS-01 challenges (proves domain ownership)
+#   3. Solves DNS-01 challenges (proves domain ownership via TXT records)
 #   4. Stores certs as Kubernetes Secrets
 #   5. Auto-renews ~30 days before expiry
 #
 # --set crds.enabled=true installs the CRDs (CustomResourceDefinitions)
-# that define cert-manager's API types (Certificate, ClusterIssuer, etc.)
+# --set config.enableGatewayAPI=true enables Gateway API integration
 
 if ! kubectl get namespace cert-manager &>/dev/null; then
     info "Installing cert-manager..."
@@ -104,6 +118,7 @@ if ! kubectl get namespace cert-manager &>/dev/null; then
         --namespace cert-manager \
         --create-namespace \
         --set crds.enabled=true \
+        --set config.enableGatewayAPI=true \
         --wait
     ok "cert-manager installed"
 else
@@ -113,11 +128,8 @@ fi
 # --- Install cert-manager-webhook-scaleway ---
 #
 # Webhook solver for DNS-01 challenges via Scaleway DNS API.
-# Used for the apex domain (sovereigncloudwisdom.eu) where HTTP-01 fails
-# due to hairpin NAT + proxy protocol issues on Scaleway.
-#
-# The webhook creates/deletes TXT records (_acme-challenge.<domain>)
-# to prove domain ownership without any HTTP traffic.
+# Creates/deletes TXT records (_acme-challenge.<domain>) to prove
+# domain ownership without any HTTP traffic.
 
 info "Creating Scaleway DNS credentials for cert-manager..."
 kubectl create secret generic scaleway-dns-credentials \
@@ -236,7 +248,7 @@ kubectl create configmap app-config \
     --dry-run=client -o yaml | kubectl apply -f -
 ok "ConfigMap created"
 
-# --- Apply Deployment, Service, and Ingress ---
+# --- Apply Deployment, Service, and HTTPRoute ---
 
 info "Applying app Deployment..."
 kubectl apply -f "$K8S_DIR/app/deployment.yaml"
@@ -244,34 +256,36 @@ kubectl apply -f "$K8S_DIR/app/deployment.yaml"
 info "Applying app Service..."
 kubectl apply -f "$K8S_DIR/app/service.yaml"
 
-# --- Apply ClusterIssuer and Ingress ---
+# --- Apply ClusterIssuer and HTTPRoute ---
 #
-# ClusterIssuer must exist before the Ingress, because cert-manager reads
-# the Ingress annotation and looks up the referenced ClusterIssuer to know
-# which ACME server to use.
+# ClusterIssuer must exist before the Gateway can obtain certificates,
+# because cert-manager reads the Gateway annotation and looks up the
+# referenced ClusterIssuer to know which ACME server to use.
 
 info "Applying ClusterIssuer..."
-kubectl apply -f "$K8S_DIR/ingress/cluster-issuer.yaml"
+kubectl apply -f "$K8S_DIR/gateway/cluster-issuer.yaml"
 
-info "Applying app Ingress..."
-kubectl apply -f "$K8S_DIR/app/ingress.yaml"
+info "Applying app HTTPRoute..."
+kubectl apply -f "$K8S_DIR/app/httproute.yaml"
 
 ok "App deployed"
 
-# --- Wait for Load Balancer IP ---
+# --- Wait for Load Balancer address ---
 
 echo ""
 info "Waiting for the Load Balancer external address..."
 
 LB_ADDRESS=""
 for i in $(seq 1 30); do
-    LB_ADDRESS=$(kubectl get svc ingress-nginx-controller \
-        -n ingress-nginx \
-        -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+    LB_ADDRESS=$(kubectl get svc \
+        -n envoy-gateway-system \
+        -l gateway.envoyproxy.io/owning-gateway-name=eg \
+        -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
     if [[ -z "$LB_ADDRESS" ]]; then
-        LB_ADDRESS=$(kubectl get svc ingress-nginx-controller \
-            -n ingress-nginx \
-            -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+        LB_ADDRESS=$(kubectl get svc \
+            -n envoy-gateway-system \
+            -l gateway.envoyproxy.io/owning-gateway-name=eg \
+            -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
     fi
     if [[ -n "$LB_ADDRESS" ]]; then
         break
@@ -284,18 +298,17 @@ if [[ -n "$LB_ADDRESS" ]]; then
     ok "Load Balancer address: $LB_ADDRESS"
     echo ""
     echo -e "${BLUE}DNS configuration:${NC}"
-    echo "  CNAME for subdomain:"
-    echo "    scw.sovereigncloudwisdom.eu → $LB_ADDRESS"
-    echo ""
-    echo "  A record for apex domain (resolve LB hostname to IP first):"
+    echo "  A record for the apex domain (resolve LB hostname to IP first):"
     echo "    sovereigncloudwisdom.eu → <LB IP>"
     echo ""
+    echo "  To get the IP: dig +short $LB_ADDRESS"
+    echo ""
     echo "  Once DNS propagates, cert-manager will automatically obtain"
-    echo "  Let's Encrypt certificates. Check progress with:"
-    echo "    kubectl get certificate -n sovereign-wisdom"
+    echo "  a Let's Encrypt certificate via DNS-01. Check progress with:"
+    echo "    kubectl get certificate -n envoy-gateway-system"
 else
     err "Timed out waiting for Load Balancer address (5 minutes)."
-    echo "  Check status with: kubectl get svc -n ingress-nginx"
+    echo "  Check status with: kubectl get svc -n envoy-gateway-system"
 fi
 
 echo ""

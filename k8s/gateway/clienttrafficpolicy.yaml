@@ -1,0 +1,16 @@
+# ClientTrafficPolicy — tells Envoy to read PROXY protocol headers from the
+# Scaleway Load Balancer, extracting the real client IP for X-Forwarded-For.
+#
+# Without this, Envoy would see the LB's internal IP as the client address.
+
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: ClientTrafficPolicy
+metadata:
+  name: enable-proxy-protocol
+  namespace: envoy-gateway-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: eg
+  proxyProtocol: {}

@@ -93,8 +93,8 @@ This infrastructure supports GDPR compliance through:
   - *Code:* [`infrastructure/modules/vpc/main.tf`](infrastructure/modules/vpc/main.tf)
 - **Private database:** PostgreSQL is accessible only from within the private network — no public endpoint exists
   - *Code:* [`infrastructure/modules/database/main.tf`](infrastructure/modules/database/main.tf) — `private_network` block
-- **Single entry point:** Only the CCM-managed Load Balancer (provisioned by the NGINX Ingress Controller) has a public IP, acting as the sole ingress point
-  - *Code:* [`k8s/ingress/nginx-values.yaml`](k8s/ingress/nginx-values.yaml)
+- **Single entry point:** Only the CCM-managed Load Balancer (provisioned by Envoy Gateway) has a public IP, acting as the sole ingress point
+  - *Code:* [`k8s/gateway/envoyproxy.yaml`](k8s/gateway/envoyproxy.yaml)
 
 **Data Minimization & Purpose Limitation**
 
@@ -133,16 +133,16 @@ No data leaves French territory. Scaleway's Paris datacenters (DC2-DC5) are loca
 ### Network Security
 
 ```
-Internet → Load Balancer (TCP/443, proxy protocol v2) → NGINX Ingress Controller (TLS termination) → Private Network (172.16.0.0/22) → App Pods / PostgreSQL
+Internet → Load Balancer (TCP/443, proxy protocol v2) → Envoy Gateway (TLS termination) → Private Network (172.16.0.0/22) → App Pods / PostgreSQL
 ```
 
 - **VPC isolation:** All internal resources communicate over a private network
 - **No public IPs** on Kubernetes nodes or database instances
 - **Cilium CNI:** The Kubernetes cluster uses Cilium, which supports fine-grained network policies for pod-to-pod traffic control
   - *Code:* [`infrastructure/modules/kapsule/main.tf`](infrastructure/modules/kapsule/main.tf) — `cni = "cilium"`
-- **CCM-managed Load Balancer:** The Scaleway Cloud Controller Manager automatically provisions and manages the Load Balancer from the NGINX Ingress Controller Service. Backends are updated automatically when nodes change (upgrades, autoscaling).
-  - *Code:* [`k8s/ingress/nginx-values.yaml`](k8s/ingress/nginx-values.yaml)
-- **Health checks:** NGINX Ingress Controller performs health checks on upstream pods to ensure only healthy backends receive traffic
+- **CCM-managed Load Balancer:** The Scaleway Cloud Controller Manager automatically provisions and manages the Load Balancer from the Envoy Gateway Service. Backends are updated automatically when nodes change (upgrades, autoscaling).
+  - *Code:* [`k8s/gateway/envoyproxy.yaml`](k8s/gateway/envoyproxy.yaml)
+- **Health checks:** Envoy Gateway performs health checks on upstream pods to ensure only healthy backends receive traffic
 
 ### Encryption
 
@@ -156,9 +156,10 @@ Internet → Load Balancer (TCP/443, proxy protocol v2) → NGINX Ingress Contro
 
 - **Provider communication:** All Scaleway API calls use TLS 1.2+
 - **Kubernetes API:** Accessible via HTTPS only (kubeconfig uses TLS)
-- **Ingress TLS:** TLS termination at the NGINX Ingress Controller using Let's Encrypt certificates managed by cert-manager. Certificates are automatically requested, validated, and renewed. Subdomains use HTTP-01 challenges; the apex domain uses DNS-01 challenges via cert-manager-webhook-scaleway (Scaleway DNS API). All HTTP traffic is redirected to HTTPS.
-  - *Code:* [`k8s/ingress/cluster-issuer.yaml`](k8s/ingress/cluster-issuer.yaml) — ClusterIssuer for Let's Encrypt
-  - *Code:* [`k8s/app/ingress.yaml`](k8s/app/ingress.yaml) — TLS configuration and cert-manager annotation
+- **Gateway TLS:** TLS termination at Envoy Gateway using Let's Encrypt certificates managed by cert-manager. Certificates are automatically requested, validated via DNS-01 challenges (cert-manager-webhook-scaleway / Scaleway DNS API), and renewed. All HTTP traffic is redirected to HTTPS via an HTTPRoute redirect rule.
+  - *Code:* [`k8s/gateway/cluster-issuer.yaml`](k8s/gateway/cluster-issuer.yaml) — ClusterIssuer for Let's Encrypt
+  - *Code:* [`k8s/gateway/gateway.yaml`](k8s/gateway/gateway.yaml) — TLS configuration and cert-manager annotation
+  - *Code:* [`k8s/gateway/httproute-redirect.yaml`](k8s/gateway/httproute-redirect.yaml) — HTTP → HTTPS redirect
 
 ### Credentials Management
 

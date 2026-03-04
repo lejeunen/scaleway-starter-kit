@@ -93,8 +93,8 @@ Cette infrastructure contribue à la conformité RGPD à travers :
   - *Code :* [`infrastructure/modules/vpc/main.tf`](infrastructure/modules/vpc/main.tf)
 - **Base de données privée :** PostgreSQL n'est accessible que depuis le réseau privé — aucun point d'accès public n'existe
   - *Code :* [`infrastructure/modules/database/main.tf`](infrastructure/modules/database/main.tf) — bloc `private_network`
-- **Point d'entrée unique :** seul le Load Balancer géré par le CCM (provisionné par le NGINX Ingress Controller) dispose d'une IP publique, servant de point d'accès unique
-  - *Code :* [`k8s/ingress/nginx-values.yaml`](k8s/ingress/nginx-values.yaml)
+- **Point d'entrée unique :** seul le Load Balancer géré par le CCM (provisionné par Envoy Gateway) dispose d'une IP publique, servant de point d'accès unique
+  - *Code :* [`k8s/gateway/envoyproxy.yaml`](k8s/gateway/envoyproxy.yaml)
 
 **Minimisation des données & Limitation des finalités**
 
@@ -133,16 +133,16 @@ Aucune donnée ne quitte le territoire français. Les datacenters parisiens de S
 ### Sécurité réseau
 
 ```
-Internet → Load Balancer (TCP/443, proxy protocol v2) → NGINX Ingress Controller (terminaison TLS) → Réseau Privé (172.16.0.0/22) → Pods App / PostgreSQL
+Internet → Load Balancer (TCP/443, proxy protocol v2) → Envoy Gateway (terminaison TLS) → Réseau Privé (172.16.0.0/22) → Pods App / PostgreSQL
 ```
 
 - **Isolation VPC :** toutes les ressources internes communiquent via un réseau privé
 - **Aucune IP publique** sur les nœuds Kubernetes ou les instances de base de données
 - **Cilium CNI :** le cluster Kubernetes utilise Cilium, qui permet des politiques réseau granulaires pour le contrôle du trafic entre pods
   - *Code :* [`infrastructure/modules/kapsule/main.tf`](infrastructure/modules/kapsule/main.tf) — `cni = "cilium"`
-- **Load Balancer géré par le CCM :** le Cloud Controller Manager de Scaleway provisionne et gère automatiquement le Load Balancer à partir du Service du NGINX Ingress Controller. Les backends sont mis à jour automatiquement lors des changements de nœuds (mises à jour, autoscaling).
-  - *Code :* [`k8s/ingress/nginx-values.yaml`](k8s/ingress/nginx-values.yaml)
-- **Health checks :** le NGINX Ingress Controller effectue des vérifications de santé sur les pods en amont pour s'assurer que seuls les backends sains reçoivent du trafic
+- **Load Balancer géré par le CCM :** le Cloud Controller Manager de Scaleway provisionne et gère automatiquement le Load Balancer à partir du Service d'Envoy Gateway. Les backends sont mis à jour automatiquement lors des changements de nœuds (mises à jour, autoscaling).
+  - *Code :* [`k8s/gateway/envoyproxy.yaml`](k8s/gateway/envoyproxy.yaml)
+- **Health checks :** Envoy Gateway effectue des vérifications de santé sur les pods en amont pour s'assurer que seuls les backends sains reçoivent du trafic
 
 ### Chiffrement
 
@@ -156,9 +156,10 @@ Internet → Load Balancer (TCP/443, proxy protocol v2) → NGINX Ingress Contro
 
 - **Communication provider :** tous les appels API Scaleway utilisent TLS 1.2+
 - **API Kubernetes :** accessible uniquement via HTTPS (kubeconfig utilise TLS)
-- **TLS Ingress :** terminaison TLS au niveau du NGINX Ingress Controller avec des certificats Let's Encrypt gérés par cert-manager. Les certificats sont automatiquement demandés, validés et renouvelés. Les sous-domaines utilisent le challenge HTTP-01 ; le domaine apex utilise le challenge DNS-01 via cert-manager-webhook-scaleway (API DNS Scaleway). Tout le trafic HTTP est redirigé vers HTTPS.
-  - *Code :* [`k8s/ingress/cluster-issuer.yaml`](k8s/ingress/cluster-issuer.yaml) — ClusterIssuer pour Let's Encrypt
-  - *Code :* [`k8s/app/ingress.yaml`](k8s/app/ingress.yaml) — configuration TLS et annotation cert-manager
+- **TLS Gateway :** terminaison TLS au niveau d'Envoy Gateway avec des certificats Let's Encrypt gérés par cert-manager. Les certificats sont automatiquement demandés, validés via le challenge DNS-01 (cert-manager-webhook-scaleway / API DNS Scaleway), et renouvelés. Tout le trafic HTTP est redirigé vers HTTPS via une règle de redirection HTTPRoute.
+  - *Code :* [`k8s/gateway/cluster-issuer.yaml`](k8s/gateway/cluster-issuer.yaml) — ClusterIssuer pour Let's Encrypt
+  - *Code :* [`k8s/gateway/gateway.yaml`](k8s/gateway/gateway.yaml) — configuration TLS et annotation cert-manager
+  - *Code :* [`k8s/gateway/httproute-redirect.yaml`](k8s/gateway/httproute-redirect.yaml) — redirection HTTP → HTTPS
 
 ### Gestion des secrets
 
