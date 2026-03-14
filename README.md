@@ -47,7 +47,7 @@ An infrastructure starter kit for [Scaleway](https://www.scaleway.com/), built w
 | **PostgreSQL** | Managed database (PostgreSQL 16) with automated backups (daily, 7-day retention). | Private network only — no public endpoint. Password managed via Secret Manager. |
 | **Envoy Gateway** | Kubernetes Gateway API implementation using Envoy proxy. Routes traffic based on HTTPRoute rules. Exposed via a CCM-managed Scaleway Load Balancer. | TLS termination via cert-manager (Let's Encrypt). The LB is the only externally reachable component. |
 | **cert-manager** | Automates Let's Encrypt certificate lifecycle: request, DNS-01 challenge validation (via cert-manager-webhook-scaleway), storage as K8s Secret, and auto-renewal. | Certificates stored as Kubernetes Secrets, never on disk |
-| **Secret Manager** | Stores database credentials and API auth token. Synced to Kubernetes via External Secrets Operator. | Secrets never hardcoded, injected at runtime |
+| **Secret Manager** | Stores database credentials and API auth token. Terraform creates secret shells (name/tags); values are pushed via `scripts/push-secrets.sh` using the `scw` CLI, keeping them out of Terraform state. Synced to Kubernetes via External Secrets Operator. | Secrets never hardcoded, never in Terraform state, injected at runtime |
 | **Container Registry** | Private Docker image registry hosted on Scaleway. | Images stored in France, private access only |
 | **Cockpit** | Managed observability platform (Grafana, Mimir, Loki, Tempo). Kapsule metrics collected automatically. | Data stays in France, managed by Scaleway |
 
@@ -107,6 +107,7 @@ k8s/                               # Kubernetes manifests
 scripts/
 ├── validate.sh                    # Validation & security scanning
 ├── deploy.sh                      # Application deployment to Kapsule
+├── push-secrets.sh                # Push secret values to Secret Manager (bypasses TF state)
 └── rotate-api-token.sh            # Manual API token rotation
 ```
 
@@ -161,9 +162,24 @@ cd infrastructure/dev
 terragrunt run --all apply
 ```
 
-Terragrunt will deploy in order: VPC → Kapsule + Database (parallel). Secret Manager, Container Registry, and Cockpit are independent and deploy in parallel with the rest.
+Terragrunt will deploy in order: VPC -> Kapsule + Database (parallel). Secret Manager (shells only), Container Registry, and Cockpit are independent and deploy in parallel with the rest.
 
-### 4. Generate the kubeconfig
+### 4. Push secret values
+
+Terraform creates empty secret shells. Push the actual values via the `scw` CLI (keeps them out of Terraform state):
+
+```bash
+./scripts/push-secrets.sh
+```
+
+Use `--dry-run` to preview, or pass secret names to push selectively:
+
+```bash
+./scripts/push-secrets.sh --dry-run
+./scripts/push-secrets.sh dev-db-password
+```
+
+### 5. Generate the kubeconfig
 
 After the Kapsule cluster is deployed:
 
@@ -179,7 +195,7 @@ Then connect to the cluster:
 kubectl get nodes
 ```
 
-### 5. Deploy the application
+### 6. Deploy the application
 
 The starter kit includes Kubernetes manifests for [**Sovereign Cloud Wisdom**](https://github.com/lejeunen/sovereign-cloud-wisdom), a demo application that serves curated wisdom about European digital sovereignty.
 
@@ -209,7 +225,7 @@ The script will:
 After the script completes, it prints the Load Balancer hostname. Create a DNS record:
 
 ```
-sovereigncloudwisdom.eu  A → <LB IP>
+sovereigncloudwisdom.eu  A -> <LB IP>
 ```
 
 > **Note:** Apex domains cannot use CNAME records (DNS specification). Resolve the LB hostname to get the IP: `dig +short <LB hostname>`.
@@ -238,7 +254,7 @@ To rotate the token manually:
 ./scripts/rotate-api-token.sh
 ```
 
-### 6. Access the Grafana dashboard
+### 7. Access the Grafana dashboard
 
 Cockpit is Scaleway's managed observability platform. Kapsule metrics are collected automatically at no cost, and is very easy to set up.
 

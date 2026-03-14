@@ -163,15 +163,17 @@ Internet → Load Balancer (TCP/443, proxy protocol v2) → Envoy Gateway (termi
 
 ### Gestion des secrets
 
-- **Scaleway Secret Manager :** les identifiants de base de données sont stockés dans le service Secret Manager managé de Scaleway, utilisant le chiffrement par enveloppe (AES-256) via KMS
+- **Scaleway Secret Manager :** les identifiants de base de données et tokens API sont stockés dans le service Secret Manager managé de Scaleway, utilisant le chiffrement par enveloppe (AES-256) via KMS
   - *Code :* [`infrastructure/modules/secret-manager/main.tf`](infrastructure/modules/secret-manager/main.tf)
-- **External Secrets Operator :** les secrets sont synchronisés depuis Scaleway Secret Manager vers les secrets Kubernetes au moment de l'exécution — les identifiants ne sont jamais intégrés dans les manifestes ou les images de conteneurs
+- **Valeurs secrètes hors du state Terraform :** Terraform ne gère que les enveloppes de secrets (nom, description, tags). Les valeurs sont poussées via le CLI `scw` (`scripts/push-secrets.sh`), garantissant que les données sensibles n'apparaissent jamais dans les fichiers d'état Terraform.
+  - *Code :* [`scripts/push-secrets.sh`](scripts/push-secrets.sh)
+- **External Secrets Operator :** les secrets sont synchronisés depuis Scaleway Secret Manager vers les secrets Kubernetes au moment de l'exécution - les identifiants ne sont jamais intégrés dans les manifestes ou les images de conteneurs
   - *Code :* [`k8s/external-secrets/`](k8s/external-secrets/)
-- **Aucun identifiant en dur :** tous les identifiants (clés API, mots de passe) proviennent de variables d'environnement ou de Secret Manager — jamais commités dans le code
+- **Aucun identifiant en dur :** tous les identifiants (clés API, mots de passe) proviennent de variables d'environnement ou de Secret Manager - jamais commités dans le code
   - *Code :* `.env.example` pour le modèle d'identifiants, `.gitignore` exclut `.env`
 - **Sorties sensibles :** les sorties Terraform contenant des secrets sont marquées `sensitive = true` pour empêcher toute exposition accidentelle dans les logs
-  - *Code :* [`infrastructure/modules/kapsule/outputs.tf`](infrastructure/modules/kapsule/outputs.tf) — sortie kubeconfig
-  - *Code :* [`infrastructure/modules/database/variables.tf`](infrastructure/modules/database/variables.tf) — variable mot de passe
+  - *Code :* [`infrastructure/modules/kapsule/outputs.tf`](infrastructure/modules/kapsule/outputs.tf) - sortie kubeconfig
+  - *Code :* [`infrastructure/modules/database/variables.tf`](infrastructure/modules/database/variables.tf) - variable mot de passe
 - **Validation stricte :** Terragrunt échoue immédiatement si les secrets requis (ex. `TF_VAR_db_password`) ne sont pas définis — aucune valeur par défaut
 
 ### Audit & Traçabilité

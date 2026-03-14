@@ -11,9 +11,7 @@ terraform {
 }
 
 inputs = {
-  secret_name        = local.env.locals.api_auth_token_secret
-  secret_data        = get_env("TF_VAR_api_auth_token")
-  description        = "API token for the sovereign-wisdom POST /api/wisdom endpoint"
-  externally_rotated = true
-  tags               = local.env.locals.tags
+  secret_name = local.env.locals.api_auth_token_secret
+  description = "API token for the sovereign-wisdom POST /api/wisdom endpoint"
+  tags        = local.env.locals.tags
 }

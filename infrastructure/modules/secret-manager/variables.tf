@@ -3,12 +3,6 @@ variable "secret_name" {
   type        = string
 }
 
-variable "secret_data" {
-  description = "The secret value to store."
-  type        = string
-  sensitive   = true
-}
-
 variable "description" {
   description = "Description of the secret."
   type        = string
@@ -19,10 +13,4 @@ variable "tags" {
   description = "Tags to associate with the secret."
   type        = list(string)
   default     = []
-}
-
-variable "externally_rotated" {
-  description = "If true, ignore secret data changes to avoid overwriting values rotated outside of Terraform."
-  type        = bool
-  default     = false
 }

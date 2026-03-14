@@ -12,7 +12,6 @@ terraform {
 
 inputs = {
   secret_name = local.env.locals.secret_name
-  secret_data = get_env("TF_VAR_db_password")
   description = "Database password for the ${local.env.locals.db_name} database"
   tags        = local.env.locals.tags
 }

@@ -163,15 +163,17 @@ Internet → Load Balancer (TCP/443, proxy protocol v2) → Envoy Gateway (TLS t
 
 ### Credentials Management
 
-- **Scaleway Secret Manager:** Database credentials are stored in Scaleway's managed Secret Manager service, using envelope encryption (AES-256) via KMS
+- **Scaleway Secret Manager:** Database credentials and API tokens are stored in Scaleway's managed Secret Manager service, using envelope encryption (AES-256) via KMS
   - *Code:* [`infrastructure/modules/secret-manager/main.tf`](infrastructure/modules/secret-manager/main.tf)
-- **External Secrets Operator:** Secrets are synced from Scaleway Secret Manager to Kubernetes secrets at runtime — credentials are never baked into manifests or container images
+- **Secret values kept out of Terraform state:** Terraform manages only secret shells (name, description, tags). Actual secret values are pushed via the `scw` CLI (`scripts/push-secrets.sh`), ensuring sensitive data never appears in Terraform state files.
+  - *Code:* [`scripts/push-secrets.sh`](scripts/push-secrets.sh)
+- **External Secrets Operator:** Secrets are synced from Scaleway Secret Manager to Kubernetes secrets at runtime - credentials are never baked into manifests or container images
   - *Code:* [`k8s/external-secrets/`](k8s/external-secrets/)
-- **No hardcoded credentials:** All credentials (API keys, database passwords) are sourced from environment variables or Secret Manager — never committed to code
+- **No hardcoded credentials:** All credentials (API keys, database passwords) are sourced from environment variables or Secret Manager - never committed to code
   - *Code:* `.env.example` for credential template, `.gitignore` excludes `.env`
 - **Sensitive outputs:** Terraform outputs containing secrets are marked `sensitive = true` to prevent accidental exposure in logs
-  - *Code:* [`infrastructure/modules/kapsule/outputs.tf`](infrastructure/modules/kapsule/outputs.tf) — kubeconfig output
-  - *Code:* [`infrastructure/modules/database/variables.tf`](infrastructure/modules/database/variables.tf) — password variable
+  - *Code:* [`infrastructure/modules/kapsule/outputs.tf`](infrastructure/modules/kapsule/outputs.tf) - kubeconfig output
+  - *Code:* [`infrastructure/modules/database/variables.tf`](infrastructure/modules/database/variables.tf) - password variable
 - **Strict validation:** Terragrunt fails fast if required secrets (e.g., `TF_VAR_db_password`) are not set — no fallback defaults
 
 ### Audit & Traceability
